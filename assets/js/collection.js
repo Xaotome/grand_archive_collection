@@ -42,6 +42,29 @@ class CollectionManager {
             });
         }
 
+        // Filtres de collection
+        const setFilter = document.getElementById('collection-set-filter');
+        const classFilter = document.getElementById('collection-class-filter');
+        const elementFilter = document.getElementById('collection-element-filter');
+        
+        if (setFilter) {
+            setFilter.addEventListener('change', () => {
+                this.filterCollection(collectionSearch ? collectionSearch.value : '');
+            });
+        }
+        
+        if (classFilter) {
+            classFilter.addEventListener('change', () => {
+                this.filterCollection(collectionSearch ? collectionSearch.value : '');
+            });
+        }
+        
+        if (elementFilter) {
+            elementFilter.addEventListener('change', () => {
+                this.filterCollection(collectionSearch ? collectionSearch.value : '');
+            });
+        }
+
         // Formulaire de recherche
         const searchForm = document.getElementById('search-form');
         if (searchForm) {
@@ -103,11 +126,17 @@ class CollectionManager {
 
     async loadSetsAndClasses() {
         try {
-            const [setsResponse, classesResponse] = await Promise.all([
+            const [setsResponse, classesResponse, elementsResponse, 
+                   collectionSetsResponse, collectionClassesResponse, collectionElementsResponse] = await Promise.all([
                 this.api.getSets(),
-                this.api.getClasses()
+                this.api.getClasses(),
+                this.api.getElements(),
+                this.api.getCollectionSets(),
+                this.api.getCollectionClasses(),
+                this.api.getCollectionElements()
             ]);
 
+            // Pour le formulaire de recherche (toutes les options)
             if (setsResponse.success) {
                 this.populateSetSelect(setsResponse.data);
             }
@@ -115,8 +144,25 @@ class CollectionManager {
             if (classesResponse.success) {
                 this.populateClassSelect(classesResponse.data);
             }
+
+            if (elementsResponse.success) {
+                this.populateElementSelect(elementsResponse.data);
+            }
+
+            // Pour les filtres de collection (seulement les options présentes dans la collection)
+            if (collectionSetsResponse.success) {
+                this.populateCollectionSetFilter(collectionSetsResponse.data);
+            }
+
+            if (collectionClassesResponse.success) {
+                this.populateCollectionClassFilter(collectionClassesResponse.data);
+            }
+
+            if (collectionElementsResponse.success) {
+                this.populateCollectionElementFilter(collectionElementsResponse.data);
+            }
         } catch (error) {
-            console.error('Erreur lors du chargement des sets/classes:', error);
+            console.error('Erreur lors du chargement des sets/classes/elements:', error);
         }
     }
 
@@ -143,6 +189,58 @@ class CollectionManager {
             option.value = classData.class_name;
             option.textContent = classData.class_name;
             classSelect.appendChild(option);
+        });
+    }
+
+    populateElementSelect(elements) {
+        const elementSelect = document.getElementById('card-element');
+        if (!elementSelect) return;
+
+        elementSelect.innerHTML = '<option value="">Tous les éléments</option>';
+        elements.forEach(element => {
+            const option = document.createElement('option');
+            option.value = element;
+            option.textContent = element;
+            elementSelect.appendChild(option);
+        });
+    }
+
+    populateCollectionSetFilter(sets) {
+        const setFilter = document.getElementById('collection-set-filter');
+        if (!setFilter) return;
+
+        setFilter.innerHTML = '<option value="">Toutes extensions</option>';
+        sets.forEach(set => {
+            const option = document.createElement('option');
+            option.value = set.prefix;
+            option.textContent = `${set.name} (${set.prefix})`;
+            setFilter.appendChild(option);
+        });
+    }
+
+    populateCollectionClassFilter(classes) {
+        const classFilter = document.getElementById('collection-class-filter');
+        if (!classFilter) return;
+
+        classFilter.innerHTML = '<option value="">Toutes classes</option>';
+        classes.forEach(classData => {
+            const option = document.createElement('option');
+            option.value = classData.class_name;
+            option.textContent = classData.class_name;
+            classFilter.appendChild(option);
+        });
+    }
+
+    populateCollectionElementFilter(elements) {
+        const elementFilter = document.getElementById('collection-element-filter');
+        if (!elementFilter) return;
+
+        elementFilter.innerHTML = '<option value="">Tous éléments</option>';
+        elements.forEach(element => {
+            const option = document.createElement('option');
+            option.value = element;
+            option.textContent = element;
+            elementFilter.appendChild(option);
         });
     }
 
@@ -230,13 +328,35 @@ class CollectionManager {
         }
     }
 
-    async filterCollection(query) {
+    async filterCollection(query = '') {
         try {
             const filters = { name: query };
+            
+            // Ajouter les filtres de classe, élément et extension
+            const setFilter = document.getElementById('collection-set-filter');
+            const classFilter = document.getElementById('collection-class-filter');
+            const elementFilter = document.getElementById('collection-element-filter');
+            
+            if (setFilter && setFilter.value) {
+                filters.set = setFilter.value;
+            }
+            
+            if (classFilter && classFilter.value) {
+                filters.class = classFilter.value;
+            }
+            
+            if (elementFilter && elementFilter.value) {
+                filters.element = elementFilter.value;
+            }
+            
+            console.log('Filtres appliqués:', filters); // Debug
             const response = await this.api.getMyCollection(filters);
+            console.log('Réponse API collection:', response); // Debug
             
             if (response.success) {
                 this.displayCards(response.data, 'collection-cards');
+            } else {
+                console.error('Erreur API collection:', response.error);
             }
         } catch (error) {
             console.error('Erreur lors du filtrage:', error);
@@ -254,11 +374,13 @@ class CollectionManager {
             const nameInput = document.getElementById('card-name');
             const setSelect = document.getElementById('card-set');
             const classSelect = document.getElementById('card-class');
+            const elementSelect = document.getElementById('card-element');
             
             const params = {
                 name: nameInput ? nameInput.value.trim() : '',
                 set_prefix: setSelect ? setSelect.value : '',
-                class: classSelect ? classSelect.value : ''
+                class: classSelect ? classSelect.value : '',
+                element: elementSelect ? elementSelect.value : ''
             };
 
             console.log('Paramètres de recherche:', params); // Debug
@@ -267,8 +389,10 @@ class CollectionManager {
             console.log('Réponse recherche:', response); // Debug
             
             if (response && response.success) {
+                console.log('Nombre de résultats:', response.data.length); // Debug
                 this.displayCards(response.data, 'search-results');
             } else {
+                console.error('Erreur de recherche:', response?.error || 'Erreur inconnue');
                 throw new Error(response?.error || 'Erreur lors de la recherche');
             }
         } catch (error) {

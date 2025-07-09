@@ -183,6 +183,8 @@ class Collection {
                         c.name,
                         c.slug,
                         c.element,
+                        c.effect,
+                        c.effect_html,
                         c.types,
                         c.subtypes,
                         c.classes,
@@ -221,8 +223,14 @@ class Collection {
         }
 
         if (!empty($filters['class'])) {
-            $sql .= " AND JSON_CONTAINS(c.classes, JSON_QUOTE(:class))";
-            $params[':class'] = $filters['class'];
+            // Utilisation de LIKE pour chercher dans le JSON - Compatible avec toutes les versions MySQL
+            $sql .= " AND c.classes LIKE :class";
+            $params[':class'] = '%' . $filters['class'] . '%';
+        }
+
+        if (!empty($filters['element'])) {
+            $sql .= " AND c.element = :element";
+            $params[':element'] = $filters['element'];
         }
 
         if (isset($filters['rarity'])) {
@@ -244,12 +252,19 @@ class Collection {
         $orderDir = $filters['order_dir'] ?? 'ASC';
         $sql .= " ORDER BY {$orderBy} {$orderDir}";
 
-            if (isset($filters['limit'])) {
-                $sql .= " LIMIT :limit";
-                $params[':limit'] = (int)$filters['limit'];
-            }
+        if (isset($filters['limit'])) {
+            $sql .= " LIMIT :limit";
+            $params[':limit'] = (int)$filters['limit'];
+        }
 
-            return $this->db->fetchAll($sql, $params);
+        // Debug logging
+        error_log("Collection SQL: " . $sql);
+        error_log("Collection params: " . print_r($params, true));
+
+        $result = $this->db->fetchAll($sql, $params);
+        error_log("Collection results count: " . count($result));
+        
+        return $result;
         } catch (Exception $e) {
             // Si les tables n'existent pas encore, retourner un tableau vide
             return [];
@@ -269,6 +284,60 @@ class Collection {
         ];
 
         return $this->db->fetch($sql, $params);
+    }
+
+    public function getCollectionClasses() {
+        try {
+            $sql = "SELECT DISTINCT 
+                        REPLACE(REPLACE(REPLACE(REPLACE(c.classes, '[', ''), ']', ''), '\"', ''), '\\\\', '') as class_name
+                    FROM my_collection mc
+                    JOIN cards c ON mc.card_uuid = c.uuid
+                    WHERE c.classes IS NOT NULL 
+                    AND c.classes != '[]'
+                    ORDER BY class_name";
+            
+            $result = $this->db->fetchAll($sql) ?? [];
+            
+            return $result;
+        } catch (Exception $e) {
+            error_log("Erreur getCollectionClasses: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    public function getCollectionElements() {
+        try {
+            $sql = "SELECT DISTINCT c.element 
+                    FROM my_collection mc
+                    JOIN cards c ON mc.card_uuid = c.uuid
+                    WHERE c.element IS NOT NULL AND c.element != ''
+                    ORDER BY c.element";
+            
+            $result = $this->db->fetchAll($sql) ?? [];
+            
+            // Convertir en tableau simple
+            return array_map(function($row) {
+                return $row['element'];
+            }, $result);
+        } catch (Exception $e) {
+            error_log("Erreur getCollectionElements: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    public function getCollectionSets() {
+        try {
+            $sql = "SELECT DISTINCT s.id, s.name, s.prefix
+                    FROM my_collection mc
+                    JOIN card_editions ce ON mc.edition_uuid = ce.uuid
+                    JOIN sets s ON ce.set_id = s.id
+                    ORDER BY s.name";
+            
+            return $this->db->fetchAll($sql) ?? [];
+        } catch (Exception $e) {
+            error_log("Erreur getCollectionSets: " . $e->getMessage());
+            return [];
+        }
     }
 
     public function getCollectionValue() {

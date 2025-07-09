@@ -24,10 +24,11 @@
 
 body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: var(--background);
-    color: var(--text);
+    background: var(--bg-primary);
+    color: var(--text-primary);
     line-height: 1.6;
     overflow-x: hidden;
+    position: relative;
 }
 
 .container {
@@ -201,15 +202,15 @@ body {
 /* Cards Grid */
 .cards-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: 1.5rem;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1rem;
 }
 
 /* Responsive grille pour tablettes */
 @media (max-width: 1024px) {
     .cards-grid {
-        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-        gap: 1.25rem;
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        gap: 0.75rem;
     }
 }
 
@@ -225,13 +226,13 @@ body {
 
 /* Ajuster la taille de l'image en vue grille */
 .cards-grid:not(.list-view) .card-item {
-    max-width: 300px;
+    max-width: 200px;
     margin: 0 auto;
 }
 
 .cards-grid:not(.list-view) .card-image {
     width: 100%;
-    max-width: 300px;
+    max-width: 200px;
 }
 
 /* Simplifier l'affichage en vue grille */
@@ -756,8 +757,37 @@ body {
 
 .form-row {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr 1fr 1fr;
     gap: 1rem;
+}
+
+/* Collection Filters */
+.collection-filters {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.filter-select {
+    background: var(--surface-dark);
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    color: var(--text);
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    min-width: 120px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.filter-select:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.filter-select:hover {
+    border-color: var(--primary-color);
 }
 
 .form-group {
@@ -1088,8 +1118,18 @@ body {
         align-items: stretch;
     }
     
+    .collection-filters {
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+    
+    .filter-select {
+        flex: 1;
+        min-width: 100px;
+    }
+    
     .cards-grid {
-        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
     }
     
     .form-row {
@@ -1193,7 +1233,7 @@ body {
     }
     
     .cards-grid:not(.list-view) {
-        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
     }
     
     .nav-btn {

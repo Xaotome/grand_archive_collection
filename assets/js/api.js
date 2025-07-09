@@ -120,6 +120,26 @@ class API {
         return this.request('/cards.php?action=classes');
     }
 
+    // Récupérer tous les éléments
+    async getElements() {
+        return this.request('/cards.php?action=elements');
+    }
+
+    // Récupérer les classes présentes dans la collection
+    async getCollectionClasses() {
+        return this.request('/cards.php?action=collection_classes');
+    }
+
+    // Récupérer les éléments présents dans la collection
+    async getCollectionElements() {
+        return this.request('/cards.php?action=collection_elements');
+    }
+
+    // Récupérer les extensions présentes dans la collection
+    async getCollectionSets() {
+        return this.request('/cards.php?action=collection_sets');
+    }
+
     // Récupérer les cartes récemment ajoutées
     async getRecentlyAdded(limit = 10) {
         return this.request(`/cards.php?action=recent&limit=${limit}`);

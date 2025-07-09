@@ -228,11 +228,14 @@ class Card {
         }
 
         if (!empty($params['class'])) {
-            // Essayons d'abord la recherche exacte JSON
-            $sql .= " AND (JSON_CONTAINS(c.classes, JSON_QUOTE(:class)) OR JSON_CONTAINS(c.classes, JSON_QUOTE(:class_upper)) OR LOWER(c.classes) LIKE LOWER(:class_like))";
-            $queryParams[':class'] = $params['class'];
-            $queryParams[':class_upper'] = strtoupper($params['class']);
-            $queryParams[':class_like'] = '%' . strtolower($params['class']) . '%';
+            // Utilisation de LIKE pour chercher dans le JSON - Compatible avec toutes les versions MySQL
+            $sql .= " AND c.classes LIKE :class";
+            $queryParams[':class'] = '%' . $params['class'] . '%';
+        }
+
+        if (!empty($params['element'])) {
+            $sql .= " AND c.element = :element";
+            $queryParams[':element'] = $params['element'];
         }
 
         if (isset($params['rarity'])) {
@@ -250,8 +253,14 @@ class Card {
             $sql .= " LIMIT " . (int)$params['limit'];
         }
 
+        // Debug logging
+        error_log("Search SQL: " . $sql);
+        error_log("Search params: " . print_r($queryParams, true));
+        
+        $result = $this->db->fetchAll($sql, $queryParams);
+        error_log("Search results count: " . count($result));
             
-            return $this->db->fetchAll($sql, $queryParams);
+        return $result;
         } catch (Exception $e) {
             error_log("Erreur lors de la recherche de cartes: " . $e->getMessage());
             return [];
@@ -473,20 +482,31 @@ class Card {
 
     public function getAllClasses() {
         try {
-            // Requête simplifiée qui fonctionne même avec des tables vides
-            $sql = "SELECT DISTINCT class_name 
-                    FROM (
-                        SELECT 'Champion' as class_name
-                        UNION SELECT 'Guardian' as class_name
-                        UNION SELECT 'Warrior' as class_name
-                        UNION SELECT 'Ranger' as class_name
-                        UNION SELECT 'Mage' as class_name
-                        UNION SELECT 'Assassin' as class_name
-                        UNION SELECT 'Cleric' as class_name
-                        UNION SELECT 'Tamer' as class_name
-                    ) default_classes
+            // Utiliser les vraies données de la base avec une approche compatible
+            $sql = "SELECT DISTINCT 
+                        REPLACE(REPLACE(REPLACE(REPLACE(c.classes, '[', ''), ']', ''), '\"', ''), '\\\\', '') as class_name
+                    FROM cards c
+                    WHERE c.classes IS NOT NULL 
+                    AND c.classes != '[]'
                     ORDER BY class_name";
-            return $this->db->fetchAll($sql) ?? [];
+            
+            $result = $this->db->fetchAll($sql) ?? [];
+            
+            // Si pas de données, retourner les classes par défaut
+            if (empty($result)) {
+                return [
+                    ['class_name' => 'Champion'],
+                    ['class_name' => 'Guardian'],
+                    ['class_name' => 'Warrior'],
+                    ['class_name' => 'Ranger'],
+                    ['class_name' => 'Mage'],
+                    ['class_name' => 'Assassin'],
+                    ['class_name' => 'Cleric'],
+                    ['class_name' => 'Tamer']
+                ];
+            }
+            
+            return $result;
         } catch (Exception $e) {
             // Retourner des classes par défaut en cas d'erreur
             return [
@@ -499,6 +519,31 @@ class Card {
                 ['class_name' => 'Cleric'],
                 ['class_name' => 'Tamer']
             ];
+        }
+    }
+
+    public function getAllElements() {
+        try {
+            // Utiliser les vraies données de la base
+            $sql = "SELECT DISTINCT element 
+                    FROM cards 
+                    WHERE element IS NOT NULL AND element != ''
+                    ORDER BY element";
+            
+            $result = $this->db->fetchAll($sql) ?? [];
+            
+            // Si pas de données, retourner les éléments par défaut
+            if (empty($result)) {
+                return ['Fire', 'Water', 'Wind', 'Earth', 'Light', 'Shadow', 'Arcane', 'Norm'];
+            }
+            
+            // Convertir en tableau simple
+            return array_map(function($row) {
+                return $row['element'];
+            }, $result);
+        } catch (Exception $e) {
+            // Retourner des éléments par défaut en cas d'erreur
+            return ['Fire', 'Water', 'Wind', 'Earth', 'Light', 'Shadow', 'Arcane', 'Norm'];
         }
     }
 

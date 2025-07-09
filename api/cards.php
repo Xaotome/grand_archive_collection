@@ -52,6 +52,7 @@ function handleGet($card, $collection, $action) {
                 'name' => $_GET['name'] ?? '',
                 'set_prefix' => $_GET['set_prefix'] ?? '',
                 'class' => $_GET['class'] ?? '',
+                'element' => $_GET['element'] ?? '',
                 'rarity' => isset($_GET['rarity']) ? (int)$_GET['rarity'] : null,
                 'owned_only' => isset($_GET['owned_only']) ? (bool)$_GET['owned_only'] : false,
                 'limit' => isset($_GET['limit']) ? (int)$_GET['limit'] : 50
@@ -59,6 +60,8 @@ function handleGet($card, $collection, $action) {
             
             
             $results = $card->searchCards($params);
+            error_log("API Search - Params: " . print_r($params, true));
+            error_log("API Search - Results count: " . count($results));
             echo json_encode(['success' => true, 'data' => $results]);
             break;
 
@@ -85,6 +88,7 @@ function handleGet($card, $collection, $action) {
                 'name' => $_GET['name'] ?? '',
                 'set_prefix' => $_GET['set'] ?? '',
                 'class' => $_GET['class'] ?? '',
+                'element' => $_GET['element'] ?? '',
                 'rarity' => isset($_GET['rarity']) ? (int)$_GET['rarity'] : null,
                 'is_foil' => isset($_GET['foil']) ? (bool)$_GET['foil'] : null,
                 'condition' => $_GET['condition'] ?? '',
@@ -94,6 +98,8 @@ function handleGet($card, $collection, $action) {
             ];
             
             $myCollection = $collection->getMyCollection($filters);
+            error_log("API Collection - Filters: " . print_r($filters, true));
+            error_log("API Collection - Results count: " . count($myCollection));
             echo json_encode(['success' => true, 'data' => $myCollection]);
             break;
 
@@ -137,6 +143,26 @@ function handleGet($card, $collection, $action) {
         case 'classes':
             $classes = $card->getAllClasses();
             echo json_encode(['success' => true, 'data' => $classes]);
+            break;
+
+        case 'elements':
+            $elements = $card->getAllElements();
+            echo json_encode(['success' => true, 'data' => $elements]);
+            break;
+
+        case 'collection_classes':
+            $classes = $collection->getCollectionClasses();
+            echo json_encode(['success' => true, 'data' => $classes]);
+            break;
+
+        case 'collection_elements':
+            $elements = $collection->getCollectionElements();
+            echo json_encode(['success' => true, 'data' => $elements]);
+            break;
+
+        case 'collection_sets':
+            $sets = $collection->getCollectionSets();
+            echo json_encode(['success' => true, 'data' => $sets]);
             break;
 
         case 'recent':
