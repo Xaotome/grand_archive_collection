@@ -85,10 +85,17 @@ class Card {
     }
 
     private function saveEdition($editionData, $cardId) {
-        // Sauvegarder l'extension si elle n'existe pas
-        if (isset($editionData['set'])) {
-            $this->saveSet($editionData['set']);
+        // Validation des données d'édition
+        if (!isset($editionData['set']) || !is_array($editionData['set'])) {
+            throw new Exception("Données d'extension manquantes ou invalides pour l'édition");
         }
+        
+        if (!isset($editionData['set']['id']) || !isset($editionData['set']['name'])) {
+            throw new Exception("ID ou nom d'extension manquant");
+        }
+
+        // Sauvegarder l'extension si elle n'existe pas
+        $this->saveSet($editionData['set']);
 
         // Insérer ou mettre à jour l'édition
         $editionSql = "INSERT INTO card_editions (
@@ -111,16 +118,16 @@ class Card {
         $editionParams = [
             ':uuid' => $editionData['uuid'],
             ':card_id' => $cardId,
-            ':collector_number' => $editionData['collector_number'],
+            ':collector_number' => $editionData['collector_number'] ?? '001',
             ':set_id' => $editionData['set']['id'],
             ':configuration' => $editionData['configuration'] ?? 'default',
-            ':rarity' => $editionData['rarity'],
-            ':illustrator' => $editionData['illustrator'],
-            ':flavor' => $editionData['flavor'],
-            ':image' => $editionData['image'],
-            ':orientation' => $editionData['orientation'],
-            ':effect' => $editionData['effect'],
-            ':effect_raw' => $editionData['effect_raw']
+            ':rarity' => $editionData['rarity'] ?? 1,
+            ':illustrator' => $editionData['illustrator'] ?? '',
+            ':flavor' => $editionData['flavor'] ?? '',
+            ':image' => $editionData['image'] ?? '',
+            ':orientation' => $editionData['orientation'] ?? 'portrait',
+            ':effect' => $editionData['effect'] ?? null,
+            ':effect_raw' => $editionData['effect_raw'] ?? null
         ];
 
         $this->db->query($editionSql, $editionParams);
@@ -565,7 +572,7 @@ class Card {
             // Créer un contexte HTTP avec des headers appropriés
             $context = stream_context_create([
                 'http' => [
-                    'timeout' => 30,
+                    'timeout' => 60,
                     'user_agent' => 'Grand Archive Collection Manager/1.0',
                     'header' => [
                         'Accept: application/json',
@@ -669,6 +676,12 @@ class Card {
                             // Normaliser les données pour notre structure de base
                             $normalizedCardData = $this->normalizeCardData($cardData);
                             
+                            // Validation supplémentaire des données critiques
+                            if (!$this->validateCardData($normalizedCardData)) {
+                                $pageErrors++;
+                                continue;
+                            }
+                            
                             // Vérifier si la carte existe déjà
                             if ($this->cardExists($normalizedCardData['uuid'])) {
                                 $pageSkipped++;
@@ -730,7 +743,8 @@ class Card {
                     ];
                     
                     // Si trop d'erreurs de pages, arrêter
-                    if ($totalErrors > 10) {
+                    if ($totalErrors > 20) {
+                        $this->updateSyncStatus('error', "Trop d'erreurs de pages ({$totalErrors}), arrêt du processus");
                         throw new Exception("Trop d'erreurs de pages ({$totalErrors}), arrêt du processus");
                     }
                 }
@@ -853,16 +867,29 @@ class Card {
         } else {
             // Créer une édition par défaut si les données d'édition sont présentes au niveau carte
             if (isset($apiCardData['set']) || isset($apiCardData['rarity']) || isset($apiCardData['collector_number'])) {
+                $setData = $apiCardData['set'] ?? [
+                    'id' => 'UNK',
+                    'name' => 'Inconnu',
+                    'prefix' => 'UNK',
+                    'release_date' => '2023-01-01',
+                    'language' => 'EN'
+                ];
+                
+                // S'assurer que les données set sont complètes
+                if (!isset($setData['id']) || !isset($setData['name'])) {
+                    $setData = [
+                        'id' => $setData['id'] ?? 'UNK',
+                        'name' => $setData['name'] ?? 'Inconnu',
+                        'prefix' => $setData['prefix'] ?? 'UNK',
+                        'release_date' => $setData['release_date'] ?? '2023-01-01',
+                        'language' => $setData['language'] ?? 'EN'
+                    ];
+                }
+                
                 $normalized['editions'] = [[
                     'uuid' => $normalized['uuid'] . '-edition-1',
                     'collector_number' => $apiCardData['collector_number'] ?? '001',
-                    'set' => $apiCardData['set'] ?? [
-                        'id' => 'UNK',
-                        'name' => 'Inconnu',
-                        'prefix' => 'UNK',
-                        'release_date' => '2023-01-01',
-                        'language' => 'EN'
-                    ],
+                    'set' => $setData,
                     'rarity' => $apiCardData['rarity'] ?? 1,
                     'illustrator' => $apiCardData['illustrator'] ?? $apiCardData['artist'] ?? '',
                     'flavor' => $apiCardData['flavor'] ?? '',
@@ -875,6 +902,27 @@ class Card {
         }
         
         return $normalized;
+    }
+
+    private function validateCardData($cardData) {
+        // Validation basique des données requises
+        if (empty($cardData['uuid']) || empty($cardData['name'])) {
+            return false;
+        }
+        
+        // Validation des éditions si présentes
+        if (isset($cardData['editions']) && is_array($cardData['editions'])) {
+            foreach ($cardData['editions'] as $edition) {
+                if (!isset($edition['set']) || !is_array($edition['set'])) {
+                    return false;
+                }
+                if (!isset($edition['set']['id']) || !isset($edition['set']['name'])) {
+                    return false;
+                }
+            }
+        }
+        
+        return true;
     }
 
     private function ensureSyncStatusTable() {

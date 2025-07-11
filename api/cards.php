@@ -12,12 +12,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit(0);
 }
 
+// Gestion d'erreur globale pour éviter les 500
+function handleError($message, $type = 'general_error') {
+    http_response_code(200); // Éviter l'erreur 500
+    echo json_encode([
+        'success' => false,
+        'error' => $message,
+        'type' => $type
+    ]);
+    exit;
+}
+
 try {
     require_once __DIR__ . '/../classes/Card.php';
     require_once __DIR__ . '/../classes/Collection.php';
 
-    $card = new Card();
-    $collection = new Collection();
+    // Tentative de création des instances avec gestion d'erreur
+    try {
+        $card = new Card();
+        $collection = new Collection();
+    } catch (Exception $dbError) {
+        handleError(
+            'Connexion à la base de données impossible. Vérifiez que MySQL est démarré et que la base de données existe.',
+            'database_connection_error'
+        );
+    }
+    
     $method = $_SERVER['REQUEST_METHOD'];
     $action = $_GET['action'] ?? 'search';
 
@@ -41,8 +61,19 @@ try {
 
 } catch (Exception $e) {
     error_log("API Error: " . $e->getMessage());
-    http_response_code(500);
-    echo json_encode(['success' => false, 'error' => 'Erreur interne du serveur']);
+    
+    // Identifier le type d'erreur
+    $errorType = 'general_error';
+    $errorMessage = $e->getMessage();
+    
+    if (strpos($errorMessage, 'base de données') !== false || 
+        strpos($errorMessage, 'Connection refused') !== false ||
+        strpos($errorMessage, 'No such file or directory') !== false) {
+        $errorType = 'database_connection_error';
+        $errorMessage = 'Connexion à la base de données impossible. Vérifiez que MySQL est démarré.';
+    }
+    
+    handleError($errorMessage, $errorType);
 }
 
 function handleGet($card, $collection, $action) {
@@ -55,7 +86,7 @@ function handleGet($card, $collection, $action) {
                 'element' => $_GET['element'] ?? '',
                 'rarity' => isset($_GET['rarity']) ? (int)$_GET['rarity'] : null,
                 'owned_only' => isset($_GET['owned_only']) ? (bool)$_GET['owned_only'] : false,
-                'limit' => isset($_GET['limit']) ? (int)$_GET['limit'] : 50
+                'limit' => isset($_GET['limit']) ? (int)$_GET['limit'] : null
             ];
             
             
@@ -193,7 +224,13 @@ function handleGet($card, $collection, $action) {
                 echo json_encode(['success' => true, 'data' => $result]);
             } catch (Exception $e) {
                 error_log("Sync cards error: " . $e->getMessage());
-                echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+                http_response_code(200); // Éviter l'erreur 500
+                echo json_encode([
+                    'success' => false, 
+                    'error' => $e->getMessage(),
+                    'type' => 'database_connection_error',
+                    'suggestion' => 'Vérifiez que MySQL est démarré et que la base de données existe'
+                ]);
             }
             break;
 

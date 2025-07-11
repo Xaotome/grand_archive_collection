@@ -1199,7 +1199,15 @@ class CollectionManager {
                 }
                 
             } else {
-                this.addLogEntry('error', `Erreur de synchronisation: ${response.error}`);
+                let errorMessage = `Erreur de synchronisation: ${response.error}`;
+                
+                // Affichage d'un message plus clair pour les erreurs de base de données
+                if (response.type === 'database_connection_error') {
+                    errorMessage += '\n💡 Solution: Vérifiez que MySQL est démarré et que la base de données existe.';
+                    errorMessage += '\n🔧 Vous pouvez exécuter init.php ou setup.php pour créer la base de données.';
+                }
+                
+                this.addLogEntry('error', errorMessage);
             }
         } catch (error) {
             console.error('Erreur de synchronisation:', error);
