@@ -1,3 +1,7 @@
+<?php
+require_once __DIR__ . '/auth/session.php';
+$currentUser = getCurrentUser();
+?>
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -40,9 +44,28 @@
         <header class="header glass-container">
             <div class="header-content">
                 <h1 class="text-gradient"><i class="fas fa-magic"></i> Ma Collection Grand Archive</h1>
-                <button class="mobile-menu-toggle glass-button" id="mobile-menu-toggle">
-                    <i class="fas fa-bars"></i>
-                </button>
+                <div class="header-right">
+                    <?php if ($currentUser): ?>
+                        <div class="user-info">
+                            <span class="username">Bonjour, <?php echo htmlspecialchars($currentUser['username']); ?></span>
+                            <a href="auth/logout.php" class="logout-btn glass-button">
+                                <i class="fas fa-sign-out-alt"></i> Déconnexion
+                            </a>
+                        </div>
+                    <?php else: ?>
+                        <div class="auth-buttons">
+                            <a href="auth/login.php" class="auth-btn glass-button">
+                                <i class="fas fa-sign-in-alt"></i> Connexion
+                            </a>
+                            <a href="auth/register.php" class="auth-btn glass-button primary">
+                                <i class="fas fa-user-plus"></i> Inscription
+                            </a>
+                        </div>
+                    <?php endif; ?>
+                    <button class="mobile-menu-toggle glass-button" id="mobile-menu-toggle">
+                        <i class="fas fa-bars"></i>
+                    </button>
+                </div>
             </div>
             <nav class="nav glass-container" id="main-nav">
                 <button class="nav-btn glass-button active" data-view="collection">

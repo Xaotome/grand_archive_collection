@@ -1,6 +1,6 @@
 class API {
     constructor() {
-        this.baseUrl = '/grand-archive-collection/api';
+        this.baseUrl = '/api';
         this.gatcgApiUrl = 'https://api.gatcg.com';
         this.cache = new Map();
         this.cacheTimeout = 5 * 60 * 1000; // 5 minutes

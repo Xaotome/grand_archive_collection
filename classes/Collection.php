@@ -8,12 +8,16 @@ class Collection {
         $this->db = new Database();
     }
 
-    public function addToCollection($cardUuid, $editionUuid, $quantity = 1, $isFoil = false, $options = []) {
+    public function addToCollection($cardUuid, $editionUuid, $quantity = 1, $isFoil = false, $options = [], $userId = null) {
         try {
+            if ($userId === null) {
+                throw new Exception("ID utilisateur requis");
+            }
+            
             $sql = "INSERT INTO my_collection (
-                card_uuid, edition_uuid, quantity, is_foil, condition_card, notes, acquired_date, price_paid
+                user_id, card_uuid, edition_uuid, quantity, is_foil, condition_card, notes, acquired_date, price_paid
             ) VALUES (
-                :card_uuid, :edition_uuid, :quantity, :is_foil, :condition_card, :notes, :acquired_date, :price_paid
+                :user_id, :card_uuid, :edition_uuid, :quantity, :is_foil, :condition_card, :notes, :acquired_date, :price_paid
             ) ON DUPLICATE KEY UPDATE
                 quantity = quantity + VALUES(quantity),
                 condition_card = COALESCE(VALUES(condition_card), condition_card),
@@ -23,6 +27,7 @@ class Collection {
                 updated_at = CURRENT_TIMESTAMP";
 
             $params = [
+                ':user_id' => $userId,
                 ':card_uuid' => $cardUuid,
                 ':edition_uuid' => $editionUuid,
                 ':quantity' => $quantity,
@@ -42,7 +47,7 @@ class Collection {
     }
 
 
-    public function updateQuantity($cardUuid, $editionUuid, $isFoil = false, $newQuantity = 0, $isCsr = null) {
+    public function updateQuantity($cardUuid, $editionUuid, $isFoil = false, $newQuantity = 0, $isCsr = null, $userId = null) {
         try {
             // Vérifier si la colonne is_csr existe
             $csrExists = $this->columnExists('my_collection', 'is_csr');
@@ -54,20 +59,25 @@ class Collection {
                 $isCsr = false; // Forcer à false si colonne n'existe pas
             }
             
+            if ($userId === null) {
+                throw new Exception("ID utilisateur requis");
+            }
+            
             if ($newQuantity <= 0) {
-                return $this->removeFromCollection($cardUuid, $editionUuid, $isFoil, $isCsr);
+                return $this->removeFromCollection($cardUuid, $editionUuid, $isFoil, $isCsr, $userId);
             }
 
             if ($csrExists) {
                 $sql = "INSERT INTO my_collection (
-                    card_uuid, edition_uuid, quantity, is_foil, is_csr
+                    user_id, card_uuid, edition_uuid, quantity, is_foil, is_csr
                 ) VALUES (
-                    :card_uuid, :edition_uuid, :quantity, :is_foil, :is_csr
+                    :user_id, :card_uuid, :edition_uuid, :quantity, :is_foil, :is_csr
                 ) ON DUPLICATE KEY UPDATE
                     quantity = VALUES(quantity),
                     updated_at = CURRENT_TIMESTAMP";
 
                 $params = [
+                    ':user_id' => $userId,
                     ':card_uuid' => $cardUuid,
                     ':edition_uuid' => $editionUuid,
                     ':quantity' => $newQuantity,
@@ -77,14 +87,15 @@ class Collection {
             } else {
                 // Version legacy sans is_csr
                 $sql = "INSERT INTO my_collection (
-                    card_uuid, edition_uuid, quantity, is_foil
+                    user_id, card_uuid, edition_uuid, quantity, is_foil
                 ) VALUES (
-                    :card_uuid, :edition_uuid, :quantity, :is_foil
+                    :user_id, :card_uuid, :edition_uuid, :quantity, :is_foil
                 ) ON DUPLICATE KEY UPDATE
                     quantity = VALUES(quantity),
                     updated_at = CURRENT_TIMESTAMP";
 
                 $params = [
+                    ':user_id' => $userId,
                     ':card_uuid' => $cardUuid,
                     ':edition_uuid' => $editionUuid,
                     ':quantity' => $newQuantity,
@@ -123,18 +134,24 @@ class Collection {
         }
     }
 
-    public function removeFromCollection($cardUuid, $editionUuid, $isFoil = false, $isCsr = false) {
+    public function removeFromCollection($cardUuid, $editionUuid, $isFoil = false, $isCsr = false, $userId = null) {
         try {
+            if ($userId === null) {
+                throw new Exception("ID utilisateur requis");
+            }
+            
             $csrExists = $this->columnExists('my_collection', 'is_csr');
             
             if ($csrExists) {
                 $sql = "DELETE FROM my_collection 
-                        WHERE card_uuid = :card_uuid 
+                        WHERE user_id = :user_id
+                        AND card_uuid = :card_uuid 
                         AND edition_uuid = :edition_uuid 
                         AND is_foil = :is_foil 
                         AND is_csr = :is_csr";
                 
                 $params = [
+                    ':user_id' => $userId,
                     ':card_uuid' => $cardUuid,
                     ':edition_uuid' => $editionUuid,
                     ':is_foil' => $isFoil ? 1 : 0,
@@ -143,11 +160,13 @@ class Collection {
             } else {
                 // Version legacy sans is_csr
                 $sql = "DELETE FROM my_collection 
-                        WHERE card_uuid = :card_uuid 
+                        WHERE user_id = :user_id
+                        AND card_uuid = :card_uuid 
                         AND edition_uuid = :edition_uuid 
                         AND is_foil = :is_foil";
                 
                 $params = [
+                    ':user_id' => $userId,
                     ':card_uuid' => $cardUuid,
                     ':edition_uuid' => $editionUuid,
                     ':is_foil' => $isFoil ? 1 : 0
@@ -171,7 +190,7 @@ class Collection {
         }
     }
 
-    public function getMyCollection($filters = []) {
+    public function getMyCollection($filters = [], $userId = null) {
         try {
             // Vérifier si la colonne is_csr existe
             $csrExists = $this->columnExists('my_collection', 'is_csr');
@@ -209,6 +228,11 @@ class Collection {
                     JOIN card_editions ce ON mc.edition_uuid = ce.uuid
                     JOIN sets s ON ce.set_id = s.id
                     WHERE 1=1";
+
+        if ($userId !== null) {
+            $sql .= " AND mc.user_id = :user_id";
+            $params[':user_id'] = $userId;
+        }
 
         $params = [];
 

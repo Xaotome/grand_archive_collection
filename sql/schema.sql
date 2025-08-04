@@ -87,9 +87,23 @@ CREATE TABLE IF NOT EXISTS circulation_templates (
     INDEX idx_edition_kind (edition_id, kind)
 );
 
+-- Table des utilisateurs
+CREATE TABLE IF NOT EXISTS users (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(50) NOT NULL UNIQUE,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    INDEX idx_username (username),
+    INDEX idx_email (email)
+);
+
 -- Table de ma collection personnelle
 CREATE TABLE IF NOT EXISTS my_collection (
     id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
     card_uuid VARCHAR(50) NOT NULL,
     edition_uuid VARCHAR(50) NOT NULL,
     quantity INT NOT NULL DEFAULT 1,
@@ -102,10 +116,12 @@ CREATE TABLE IF NOT EXISTS my_collection (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (card_uuid) REFERENCES cards(uuid) ON DELETE CASCADE,
     FOREIGN KEY (edition_uuid) REFERENCES card_editions(uuid) ON DELETE CASCADE,
     
-    UNIQUE KEY unique_collection_entry (card_uuid, edition_uuid, is_foil, is_csr),
+    UNIQUE KEY unique_collection_entry (user_id, card_uuid, edition_uuid, is_foil, is_csr),
+    INDEX idx_user (user_id),
     INDEX idx_card (card_uuid),
     INDEX idx_edition (edition_uuid),
     INDEX idx_foil (is_foil),
@@ -131,6 +147,7 @@ CREATE TABLE IF NOT EXISTS market_prices (
 -- Table des favoris/wishlist
 CREATE TABLE IF NOT EXISTS wishlist (
     id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
     card_uuid VARCHAR(50) NOT NULL,
     edition_uuid VARCHAR(50) NOT NULL,
     priority ENUM('LOW', 'MEDIUM', 'HIGH') DEFAULT 'MEDIUM',
@@ -138,16 +155,31 @@ CREATE TABLE IF NOT EXISTS wishlist (
     notes TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (card_uuid) REFERENCES cards(uuid) ON DELETE CASCADE,
     FOREIGN KEY (edition_uuid) REFERENCES card_editions(uuid) ON DELETE CASCADE,
     
-    UNIQUE KEY unique_wishlist_entry (card_uuid, edition_uuid),
+    UNIQUE KEY unique_wishlist_entry (user_id, card_uuid, edition_uuid),
+    INDEX idx_user (user_id),
     INDEX idx_priority (priority)
 );
 
--- Vues utiles pour les statistiques
+-- Table des sessions utilisateurs
+CREATE TABLE IF NOT EXISTS user_sessions (
+    id VARCHAR(128) PRIMARY KEY,
+    user_id INT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMP NOT NULL,
+    
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_user (user_id),
+    INDEX idx_expires (expires_at)
+);
+
+-- Vues utiles pour les statistiques (modifiées pour prendre en compte les utilisateurs)
 CREATE VIEW collection_stats AS
 SELECT 
+    user_id,
     COUNT(*) as total_cards,
     COUNT(DISTINCT card_uuid) as unique_cards,
     SUM(CASE WHEN is_foil = TRUE THEN quantity ELSE 0 END) as foil_cards,
@@ -155,10 +187,12 @@ SELECT
         (SELECT set_id FROM card_editions WHERE uuid = my_collection.edition_uuid)
     ) as sets_owned,
     AVG(quantity) as avg_quantity_per_card
-FROM my_collection;
+FROM my_collection
+GROUP BY user_id;
 
 CREATE VIEW collection_by_set AS
 SELECT 
+    mc.user_id,
     s.name as set_name,
     s.prefix as set_prefix,
     COUNT(DISTINCT mc.card_uuid) as unique_cards,
@@ -167,22 +201,24 @@ SELECT
 FROM my_collection mc
 JOIN card_editions ce ON mc.edition_uuid = ce.uuid
 JOIN sets s ON ce.set_id = s.id
-GROUP BY s.id, s.name, s.prefix
-ORDER BY total_cards DESC;
+GROUP BY mc.user_id, s.id, s.name, s.prefix
+ORDER BY mc.user_id, total_cards DESC;
 
 CREATE VIEW collection_by_rarity AS
 SELECT 
+    mc.user_id,
     ce.rarity,
     COUNT(DISTINCT mc.card_uuid) as unique_cards,
     SUM(mc.quantity) as total_cards,
     SUM(CASE WHEN mc.is_foil = TRUE THEN mc.quantity ELSE 0 END) as foil_cards
 FROM my_collection mc
 JOIN card_editions ce ON mc.edition_uuid = ce.uuid
-GROUP BY ce.rarity
-ORDER BY ce.rarity;
+GROUP BY mc.user_id, ce.rarity
+ORDER BY mc.user_id, ce.rarity;
 
 CREATE VIEW collection_by_class AS
 SELECT 
+    mc.user_id,
     class_name,
     COUNT(DISTINCT mc.card_uuid) as unique_cards,
     SUM(mc.quantity) as total_cards
@@ -192,8 +228,8 @@ JOIN JSON_TABLE(
     c.classes, '$[*]' 
     COLUMNS (class_name VARCHAR(100) PATH '$')
 ) jt
-GROUP BY class_name
-ORDER BY total_cards DESC;
+GROUP BY mc.user_id, class_name
+ORDER BY mc.user_id, total_cards DESC;
 
 -- Table de statut de synchronisation
 CREATE TABLE IF NOT EXISTS sync_status (
