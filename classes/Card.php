@@ -326,7 +326,7 @@ class Card {
         }
     }
 
-    public function getCollectionStats() {
+    public function getCollectionStats($userId = null) {
         try {
             $sql = "SELECT 
                         COALESCE(COUNT(DISTINCT mc.card_uuid), 0) as unique_cards,
@@ -336,7 +336,14 @@ class Card {
                     FROM my_collection mc
                     LEFT JOIN card_editions ce ON mc.edition_uuid = ce.uuid
                     LEFT JOIN sets s ON ce.set_id = s.id";
-            $result = $this->db->fetch($sql);
+            
+            $params = [];
+            if ($userId !== null) {
+                $sql .= " WHERE mc.user_id = :user_id";
+                $params[':user_id'] = $userId;
+            }
+            
+            $result = $this->db->fetch($sql, $params);
             
             // S'assurer que les valeurs ne sont pas null
             return [
@@ -357,7 +364,7 @@ class Card {
         }
     }
 
-    public function getCollectionBySet() {
+    public function getCollectionBySet($userId = null) {
         try {
             $sql = "SELECT 
                         s.name as set_name,
@@ -366,34 +373,47 @@ class Card {
                         SUM(mc.quantity) as total_cards
                     FROM my_collection mc
                     JOIN card_editions ce ON mc.edition_uuid = ce.uuid
-                    JOIN sets s ON ce.set_id = s.id
-                    GROUP BY s.id, s.name, s.prefix
+                    JOIN sets s ON ce.set_id = s.id";
+            
+            $params = [];
+            if ($userId !== null) {
+                $sql .= " WHERE mc.user_id = :user_id";
+                $params[':user_id'] = $userId;
+            }
+            
+            $sql .= " GROUP BY s.id, s.name, s.prefix
                     ORDER BY s.release_date DESC";
-            return $this->db->fetchAll($sql) ?? [];
+            return $this->db->fetchAll($sql, $params) ?? [];
         } catch (Exception $e) {
             error_log("Erreur getCollectionBySet: " . $e->getMessage());
             return [];
         }
     }
 
-    public function getCollectionByRarity() {
+    public function getCollectionByRarity($userId = null) {
         try {
             $sql = "SELECT 
                         ce.rarity,
                         COUNT(DISTINCT mc.card_uuid) as unique_cards,
                         SUM(mc.quantity) as total_cards
                     FROM my_collection mc
-                    JOIN card_editions ce ON mc.edition_uuid = ce.uuid
-                    GROUP BY ce.rarity
-                    ORDER BY ce.rarity";
-            return $this->db->fetchAll($sql) ?? [];
+                    JOIN card_editions ce ON mc.edition_uuid = ce.uuid";
+            
+            $params = [];
+            if ($userId !== null) {
+                $sql .= " WHERE mc.user_id = :user_id";
+                $params[':user_id'] = $userId;
+            }
+            
+            $sql .= " GROUP BY ce.rarity ORDER BY ce.rarity";
+            return $this->db->fetchAll($sql, $params) ?? [];
         } catch (Exception $e) {
             error_log("Erreur getCollectionByRarity: " . $e->getMessage());
             return [];
         }
     }
 
-    public function getCollectionByClass() {
+    public function getCollectionByClass($userId = null) {
         try {
             $sql = "SELECT 
                         class_name,
@@ -409,19 +429,30 @@ class Card {
                         CROSS JOIN (
                             SELECT 0 as n UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5
                         ) numbers
-                        WHERE JSON_EXTRACT(c.classes, CONCAT('$[', numbers.n, ']')) IS NOT NULL
-                    ) class_breakdown
+                        WHERE JSON_EXTRACT(c.classes, CONCAT('$[', numbers.n, ']')) IS NOT NULL";
+            
+            if ($userId !== null) {
+                $sql .= " AND mc.user_id = :user_id";
+            }
+            
+            $sql .= "    ) class_breakdown
                     WHERE class_name IS NOT NULL
                     GROUP BY class_name
                     ORDER BY class_name";
-            return $this->db->fetchAll($sql) ?? [];
+            
+            $params = [];
+            if ($userId !== null) {
+                $params[':user_id'] = $userId;
+            }
+            
+            return $this->db->fetchAll($sql, $params) ?? [];
         } catch (Exception $e) {
             error_log("Erreur getCollectionByClass: " . $e->getMessage());
             return [];
         }
     }
 
-    public function getCollectionByElement() {
+    public function getCollectionByElement($userId = null) {
         try {
             $sql = "SELECT 
                         c.element,
@@ -429,17 +460,23 @@ class Card {
                         SUM(mc.quantity) as total_cards
                     FROM my_collection mc
                     JOIN cards c ON mc.card_uuid = c.uuid
-                    WHERE c.element IS NOT NULL AND c.element != ''
-                    GROUP BY c.element
-                    ORDER BY c.element";
-            return $this->db->fetchAll($sql) ?? [];
+                    WHERE c.element IS NOT NULL AND c.element != ''";
+            
+            $params = [];
+            if ($userId !== null) {
+                $sql .= " AND mc.user_id = :user_id";
+                $params[':user_id'] = $userId;
+            }
+            
+            $sql .= " GROUP BY c.element ORDER BY c.element";
+            return $this->db->fetchAll($sql, $params) ?? [];
         } catch (Exception $e) {
             error_log("Erreur getCollectionByElement: " . $e->getMessage());
             return [];
         }
     }
 
-    public function getCollectionProgress() {
+    public function getCollectionProgress($userId = null) {
         try {
             $sql = "SELECT 
                         s.name as set_name,
@@ -450,19 +487,34 @@ class Card {
                     FROM sets s
                     LEFT JOIN card_editions ce ON s.id = ce.set_id
                     LEFT JOIN cards c ON ce.card_id = c.uuid
-                    LEFT JOIN my_collection mc ON c.uuid = mc.card_uuid
-                    GROUP BY s.id, s.name, s.prefix
+                    LEFT JOIN my_collection mc ON c.uuid = mc.card_uuid";
+            
+            $params = [];
+            if ($userId !== null) {
+                $sql .= " AND mc.user_id = :user_id";
+                $params[':user_id'] = $userId;
+            }
+            
+            $sql .= " GROUP BY s.id, s.name, s.prefix
                     HAVING total_cards_in_set > 0
                     ORDER BY completion_percentage DESC";
-            return $this->db->fetchAll($sql) ?? [];
+            return $this->db->fetchAll($sql, $params) ?? [];
         } catch (Exception $e) {
             error_log("Erreur getCollectionProgress: " . $e->getMessage());
             return [];
         }
     }
 
-    public function getFoilStatistics() {
+    public function getFoilStatistics($userId = null) {
         try {
+            $whereClause = "mc.is_foil = 1";
+            $params = [];
+            
+            if ($userId !== null) {
+                $whereClause .= " AND mc.user_id = :user_id";
+                $params[':user_id'] = $userId;
+            }
+            
             $sql = "SELECT 
                         'Par Extension' as category,
                         s.name as label,
@@ -471,7 +523,7 @@ class Card {
                     FROM my_collection mc
                     JOIN card_editions ce ON mc.edition_uuid = ce.uuid
                     JOIN sets s ON ce.set_id = s.id
-                    WHERE mc.is_foil = 1
+                    WHERE $whereClause
                     GROUP BY s.id, s.name
                     
                     UNION ALL
@@ -483,11 +535,11 @@ class Card {
                         SUM(mc.quantity) as total_foil_quantity
                     FROM my_collection mc
                     JOIN card_editions ce ON mc.edition_uuid = ce.uuid
-                    WHERE mc.is_foil = 1
+                    WHERE $whereClause
                     GROUP BY ce.rarity
                     
                     ORDER BY category, foil_cards DESC";
-            return $this->db->fetchAll($sql) ?? [];
+            return $this->db->fetchAll($sql, $params) ?? [];
         } catch (Exception $e) {
             error_log("Erreur getFoilStatistics: " . $e->getMessage());
             return [];

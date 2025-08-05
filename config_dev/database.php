@@ -1,12 +1,12 @@
 <?php
 class Database {
-    private $host = 'localhost';
-    private $database = 'grand_archive_collection';
-    private $username = 'root';
-    private $password = '';
+    private $host = '127.0.0.1';
+    private $database = 'u658240102_grand_archive';
+    private $username = 'u658240102_grand_archive';
+    private $password = 'Xaotome$123';
     private $charset = 'utf8mb4';
     private $pdo;
-
+    
     public function __construct() {
         $this->connect();
     }

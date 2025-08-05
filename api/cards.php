@@ -153,14 +153,20 @@ function handleGet($card, $collection, $action, $currentUserId) {
             break;
 
         case 'stats':
+            if (!$currentUserId) {
+                http_response_code(401);
+                echo json_encode(['success' => false, 'error' => 'Utilisateur non connecté']);
+                return;
+            }
+            
             try {
-                $stats = $card->getCollectionStats();
-                $bySet = $card->getCollectionBySet();
-                $byRarity = $card->getCollectionByRarity();
-                $byClass = $card->getCollectionByClass();
-                $byElement = $card->getCollectionByElement();
-                $progress = $card->getCollectionProgress();
-                $foilStats = $card->getFoilStatistics();
+                $stats = $card->getCollectionStats($currentUserId);
+                $bySet = $card->getCollectionBySet($currentUserId);
+                $byRarity = $card->getCollectionByRarity($currentUserId);
+                $byClass = $card->getCollectionByClass($currentUserId);
+                $byElement = $card->getCollectionByElement($currentUserId);
+                $progress = $card->getCollectionProgress($currentUserId);
+                $foilStats = $card->getFoilStatistics($currentUserId);
                 
                 echo json_encode([
                     'success' => true,
