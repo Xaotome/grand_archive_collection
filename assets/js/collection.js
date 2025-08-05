@@ -284,7 +284,9 @@ class CollectionManager {
                 }
                 break;
             case 'sync':
-                this.loadSyncView();
+                if (this.isUserLoggedIn()) {
+                    this.loadSyncView();
+                }
                 break;
         }
     }
@@ -429,7 +431,9 @@ class CollectionManager {
             return;
         }
 
-        container.innerHTML = cards.map(card => this.createCardHTML(card)).join('');
+        // Déterminer le contexte (collection ou recherche)
+        const isSearchView = containerId === 'search-results';
+        container.innerHTML = cards.map(card => this.createCardHTML(card, isSearchView)).join('');
         
         // Ajouter les événements aux cartes
         container.querySelectorAll('.card-item').forEach((cardEl, index) => {
@@ -454,7 +458,7 @@ class CollectionManager {
         });
     }
 
-    createCardHTML(card) {
+    createCardHTML(card, showOwnershipStatus = false) {
         const imageUrl = this.api.getCardImageUrl(card.image);
         const rarityClass = `rarity-${card.rarity}`;
         const quantityBadge = card.owned_quantity > 0 ? 
@@ -463,10 +467,24 @@ class CollectionManager {
         let cardTypeClass = '';
         let typeIndicator = '';
         
-        if (card.owned_csr) {
+        // Conversion des valeurs de la base (0/1) en booléens
+        const isFoil = Boolean(parseInt(card.owned_foil));
+        const isCsr = Boolean(parseInt(card.owned_csr));
+        
+        // Debug pour CSR
+        if (card.rarity === 7 || isCsr) {
+            console.log('CSR Debug:', {
+                name: card.name,
+                rarity: card.rarity,
+                owned_csr: card.owned_csr,
+                isCsr: isCsr
+            });
+        }
+        
+        if (isCsr) {
             cardTypeClass = 'csr-card';
             typeIndicator = '<div class="csr-indicator">CSR</div>';
-        } else if (card.owned_foil) {
+        } else if (isFoil) {
             cardTypeClass = 'foil-card';
             typeIndicator = '<div class="foil-indicator">FOIL</div>';
         }
@@ -477,7 +495,7 @@ class CollectionManager {
         }
 
         return `
-            <div class="card-item ${cardTypeClass}" data-card-uuid="${card.uuid || ''}" data-edition-uuid="${card.edition_uuid || ''}">
+            <div class="card-item ${cardTypeClass}" data-card-uuid="${card.uuid || ''}" data-edition-uuid="${card.edition_uuid || ''}" data-foil="${isFoil ? 'true' : 'false'}" data-csr="${isCsr ? 'true' : 'false'}">
                 <div class="card-image">
                     <img src="${imageUrl}" alt="${card.name}" loading="lazy">
                     ${quantityBadge}
@@ -485,18 +503,15 @@ class CollectionManager {
                 </div>
                 <div class="card-info">
                     <div class="card-name">${card.name}</div>
-                    <div class="card-details">
-                        <span class="card-set">${card.set_name} (${card.set_prefix})</span>
-                        <span class="card-rarity ${rarityClass}">
-                            ${this.getRarityName(card.rarity)}
-                        </span>
-                        ${card.element ? `<span class="card-element">${card.element}</span>` : ''}
-                        ${card.classes ? `<span class="card-classes">${Array.isArray(card.classes) ? card.classes.join(', ') : card.classes}</span>` : ''}
-                    </div>
+                    <span class="card-set">${card.set_name} (${card.set_prefix})</span>
+                    <span class="card-rarity ${rarityClass}">${this.getRarityName(card.rarity)}</span>
+                    ${card.element ? `<span class="card-element">${card.element}</span>` : ''}
+                    ${card.classes ? `<span class="card-classes">${Array.isArray(card.classes) ? card.classes.join(', ') : card.classes}</span>` : ''}
                 </div>
+                ${showOwnershipStatus ? `
                 <div class="card-actions">
                     ${card.owned_quantity > 0 ? `<span class="owned-indicator">✓ Possédée (${card.owned_quantity})</span>` : `<span class="not-owned">Non possédée</span>`}
-                </div>
+                </div>` : ''}
             </div>
         `;
     }
@@ -589,7 +604,7 @@ class CollectionManager {
 
         // Quantité dans la collection
         document.getElementById('card-quantity').textContent = card.owned_quantity || 0;
-        document.getElementById('card-foil').checked = card.owned_foil || false;
+        document.getElementById('card-foil').checked = Boolean(parseInt(card.owned_foil));
     }
 
     showModal() {

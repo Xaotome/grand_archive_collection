@@ -30,6 +30,13 @@ function getCurrentUserId() {
     return $currentUser ? $currentUser['id'] : null;
 }
 
+// Fonction pour vérifier si l'utilisateur est admin
+function isCurrentUserAdmin() {
+    require_once __DIR__ . '/../auth/session.php';
+    $currentUser = getCurrentUser();
+    return $currentUser && isset($currentUser['role']) && $currentUser['role'] === 'admin';
+}
+
 try {
     require_once __DIR__ . '/../classes/Card.php';
     require_once __DIR__ . '/../classes/Collection.php';
@@ -89,6 +96,12 @@ try {
 function handleGet($card, $collection, $action, $currentUserId) {
     switch ($action) {
         case 'search':
+            if (!$currentUserId) {
+                http_response_code(401);
+                echo json_encode(['success' => false, 'error' => 'Utilisateur non connecté']);
+                return;
+            }
+            
             $params = [
                 'name' => $_GET['name'] ?? '',
                 'set_prefix' => $_GET['set_prefix'] ?? '',

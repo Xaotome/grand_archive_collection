@@ -11,7 +11,8 @@
       "Bash(grep:*)",
       "WebFetch(domain:localhost)",
       "Bash(systemctl status:*)",
-      "Bash(service mysql:*)"
+      "Bash(service mysql:*)",
+      "WebFetch(domain:www.balenciaga.com)"
     ],
     "deny": []
   }

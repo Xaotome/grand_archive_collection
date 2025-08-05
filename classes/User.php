@@ -52,7 +52,7 @@ class User {
     }
     
     public function validateSession($sessionId) {
-        $sql = "SELECT u.id, u.username, u.email 
+        $sql = "SELECT u.id, u.username, u.email, u.role 
                 FROM users u 
                 JOIN user_sessions s ON u.id = s.user_id 
                 WHERE s.id = ? AND s.expires_at > NOW()";
@@ -68,8 +68,30 @@ class User {
     }
     
     public function getUserById($userId) {
-        $sql = "SELECT id, username, email, created_at FROM users WHERE id = ?";
+        $sql = "SELECT id, username, email, role, created_at FROM users WHERE id = ?";
         return $this->db->fetch($sql, [$userId]);
+    }
+    
+    public function isAdmin($userId) {
+        try {
+            $sql = "SELECT role FROM users WHERE id = ?";
+            $user = $this->db->fetch($sql, [$userId]);
+            return $user && $user['role'] === 'admin';
+        } catch (Exception $e) {
+            // Si erreur (colonne n'existe pas), pas d'admin
+            return false;
+        }
+    }
+    
+    public function isUserAdmin($username) {
+        try {
+            $sql = "SELECT role FROM users WHERE username = ?";
+            $user = $this->db->fetch($sql, [$username]);
+            return $user && $user['role'] === 'admin';
+        } catch (Exception $e) {
+            // Si erreur (colonne n'existe pas), pas d'admin
+            return false;
+        }
     }
     
     private function userExists($username, $email) {

@@ -13,6 +13,10 @@ function checkAuth() {
             $_SESSION['user_id'] = $userData['id'];
             $_SESSION['username'] = $userData['username'];
             $_SESSION['session_id'] = $sessionId;
+            // Inclure le rôle dans les données de session si disponible
+            if (isset($userData['role'])) {
+                $_SESSION['role'] = $userData['role'];
+            }
             return $userData;
         }
     }
