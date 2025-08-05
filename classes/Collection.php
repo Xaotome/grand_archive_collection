@@ -229,12 +229,12 @@ class Collection {
                     JOIN sets s ON ce.set_id = s.id
                     WHERE 1=1";
 
+        $params = [];
+        
         if ($userId !== null) {
             $sql .= " AND mc.user_id = :user_id";
             $params[':user_id'] = $userId;
         }
-
-        $params = [];
 
         if (!empty($filters['name'])) {
             $sql .= " AND c.name LIKE :name";
@@ -295,7 +295,7 @@ class Collection {
         }
     }
 
-    public function getCardInCollection($cardUuid, $editionUuid, $isFoil = false) {
+    public function getCardInCollection($cardUuid, $editionUuid, $isFoil = false, $userId = null) {
         $sql = "SELECT * FROM my_collection 
                 WHERE card_uuid = :card_uuid 
                 AND edition_uuid = :edition_uuid 
@@ -306,21 +306,33 @@ class Collection {
             ':edition_uuid' => $editionUuid,
             ':is_foil' => $isFoil ? 1 : 0
         ];
+        
+        if ($userId !== null) {
+            $sql .= " AND user_id = :user_id";
+            $params[':user_id'] = $userId;
+        }
 
         return $this->db->fetch($sql, $params);
     }
 
-    public function getCollectionClasses() {
+    public function getCollectionClasses($userId = null) {
         try {
             $sql = "SELECT DISTINCT 
                         REPLACE(REPLACE(REPLACE(REPLACE(c.classes, '[', ''), ']', ''), '\"', ''), '\\\\', '') as class_name
                     FROM my_collection mc
                     JOIN cards c ON mc.card_uuid = c.uuid
                     WHERE c.classes IS NOT NULL 
-                    AND c.classes != '[]'
-                    ORDER BY class_name";
+                    AND c.classes != '[]'";
             
-            $result = $this->db->fetchAll($sql) ?? [];
+            $params = [];
+            if ($userId !== null) {
+                $sql .= " AND mc.user_id = :user_id";
+                $params[':user_id'] = $userId;
+            }
+            
+            $sql .= " ORDER BY class_name";
+            
+            $result = $this->db->fetchAll($sql, $params) ?? [];
             
             return $result;
         } catch (Exception $e) {
@@ -329,15 +341,22 @@ class Collection {
         }
     }
 
-    public function getCollectionElements() {
+    public function getCollectionElements($userId = null) {
         try {
             $sql = "SELECT DISTINCT c.element 
                     FROM my_collection mc
                     JOIN cards c ON mc.card_uuid = c.uuid
-                    WHERE c.element IS NOT NULL AND c.element != ''
-                    ORDER BY c.element";
+                    WHERE c.element IS NOT NULL AND c.element != ''";
             
-            $result = $this->db->fetchAll($sql) ?? [];
+            $params = [];
+            if ($userId !== null) {
+                $sql .= " AND mc.user_id = :user_id";
+                $params[':user_id'] = $userId;
+            }
+            
+            $sql .= " ORDER BY c.element";
+            
+            $result = $this->db->fetchAll($sql, $params) ?? [];
             
             // Convertir en tableau simple
             return array_map(function($row) {
@@ -349,15 +368,22 @@ class Collection {
         }
     }
 
-    public function getCollectionSets() {
+    public function getCollectionSets($userId = null) {
         try {
             $sql = "SELECT DISTINCT s.id, s.name, s.prefix
                     FROM my_collection mc
                     JOIN card_editions ce ON mc.edition_uuid = ce.uuid
-                    JOIN sets s ON ce.set_id = s.id
-                    ORDER BY s.name";
+                    JOIN sets s ON ce.set_id = s.id";
             
-            return $this->db->fetchAll($sql) ?? [];
+            $params = [];
+            if ($userId !== null) {
+                $sql .= " WHERE mc.user_id = :user_id";
+                $params[':user_id'] = $userId;
+            }
+            
+            $sql .= " ORDER BY s.name";
+            
+            return $this->db->fetchAll($sql, $params) ?? [];
         } catch (Exception $e) {
             error_log("Erreur getCollectionSets: " . $e->getMessage());
             return [];
@@ -382,7 +408,7 @@ class Collection {
         return $this->db->fetch($sql);
     }
 
-    public function getRecentlyAdded($limit = 10) {
+    public function getRecentlyAdded($limit = 10, $userId = null) {
         $sql = "SELECT 
                     c.uuid,
                     c.name,
@@ -399,11 +425,17 @@ class Collection {
                 FROM my_collection mc
                 JOIN cards c ON mc.card_uuid = c.uuid
                 JOIN card_editions ce ON mc.edition_uuid = ce.uuid
-                JOIN sets s ON ce.set_id = s.id
-                ORDER BY mc.created_at DESC
-                LIMIT :limit";
+                JOIN sets s ON ce.set_id = s.id";
+        
+        $params = [':limit' => $limit];
+        if ($userId !== null) {
+            $sql .= " WHERE mc.user_id = :user_id";
+            $params[':user_id'] = $userId;
+        }
+        
+        $sql .= " ORDER BY mc.created_at DESC LIMIT :limit";
 
-        return $this->db->fetchAll($sql, [':limit' => $limit]);
+        return $this->db->fetchAll($sql, $params);
     }
 
     public function getDuplicates() {
@@ -426,8 +458,8 @@ class Collection {
         return $this->db->fetchAll($sql);
     }
 
-    public function exportCollection($format = 'json') {
-        $collection = $this->getMyCollection();
+    public function exportCollection($format = 'json', $userId = null) {
+        $collection = $this->getMyCollection([], $userId);
         
         switch ($format) {
             case 'csv':

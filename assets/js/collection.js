@@ -115,13 +115,21 @@ class CollectionManager {
             // Charger les données pour les selects
             await this.loadSetsAndClasses();
             
-            // Charger la collection par défaut
-            await this.loadMyCollection();
+            // Charger la collection par défaut seulement si un utilisateur est connecté
+            if (this.isUserLoggedIn()) {
+                await this.loadMyCollection();
+            }
             
         } catch (error) {
             console.error('Erreur lors du chargement initial:', error);
             this.api.showNotification('Erreur lors du chargement des données', 'error');
         }
+    }
+
+    isUserLoggedIn() {
+        // Vérifier s'il y a des éléments de collection sur la page (indicateur d'utilisateur connecté)
+        return document.querySelector('#collection-cards') !== null && 
+               !document.querySelector('.auth-required');
     }
 
     async loadSetsAndClasses() {
@@ -263,13 +271,17 @@ class CollectionManager {
         // Charger les données spécifiques à la vue
         switch (viewName) {
             case 'collection':
-                this.loadMyCollection();
+                if (this.isUserLoggedIn()) {
+                    this.loadMyCollection();
+                }
                 break;
             case 'search':
                 // Pas de chargement initial pour la recherche
                 break;
             case 'stats':
-                this.loadStats();
+                if (this.isUserLoggedIn()) {
+                    this.loadStats();
+                }
                 break;
             case 'sync':
                 this.loadSyncView();

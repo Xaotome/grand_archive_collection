@@ -189,7 +189,7 @@ class Card {
         $this->db->query($templateSql, $templateParams);
     }
 
-    public function searchCards($params = []) {
+    public function searchCards($params = [], $userId = null) {
         try {
             $sql = "SELECT 
                         c.uuid,
@@ -219,10 +219,19 @@ class Card {
                     FROM cards c
                     LEFT JOIN card_editions ce ON c.uuid = ce.card_id
                     LEFT JOIN sets s ON ce.set_id = s.id
-                    LEFT JOIN my_collection mc ON ce.uuid = mc.edition_uuid
-                    WHERE 1=1";
+                    LEFT JOIN my_collection mc ON ce.uuid = mc.edition_uuid";
+            
+            if ($userId !== null) {
+                $sql .= " AND mc.user_id = :user_id";
+            }
+            
+            $sql .= " WHERE 1=1";
 
         $queryParams = [];
+        
+        if ($userId !== null) {
+            $queryParams[':user_id'] = $userId;
+        }
 
         if (!empty($params['name'])) {
             $sql .= " AND c.name LIKE :name";
@@ -274,7 +283,7 @@ class Card {
         }
     }
 
-    public function getCardById($uuid) {
+    public function getCardById($uuid, $userId = null) {
         try {
             $sql = "SELECT 
                         c.*,
@@ -296,11 +305,20 @@ class Card {
                     FROM cards c
                     LEFT JOIN card_editions ce ON c.uuid = ce.card_id
                     LEFT JOIN sets s ON ce.set_id = s.id
-                    LEFT JOIN my_collection mc ON ce.uuid = mc.edition_uuid
-                    WHERE c.uuid = :uuid
-                    LIMIT 1";
+                    LEFT JOIN my_collection mc ON ce.uuid = mc.edition_uuid";
+            
+            if ($userId !== null) {
+                $sql .= " AND mc.user_id = :user_id";
+            }
+            
+            $sql .= " WHERE c.uuid = :uuid LIMIT 1";
+            
+            $params = [':uuid' => $uuid];
+            if ($userId !== null) {
+                $params[':user_id'] = $userId;
+            }
 
-            $result = $this->db->fetch($sql, [':uuid' => $uuid]);
+            $result = $this->db->fetch($sql, $params);
             return $result;
         } catch (Exception $e) {
             error_log("Erreur lors de la récupération de la carte $uuid: " . $e->getMessage());

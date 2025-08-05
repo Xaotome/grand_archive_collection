@@ -86,6 +86,7 @@ $currentUser = getCurrentUser();
         <main class="main">
             <!-- Vue Collection -->
             <div id="collection-view" class="view active">
+                <?php if ($currentUser): ?>
                 <div class="toolbar glass-container">
                     <div class="search-box">
                         <i class="fas fa-search"></i>
@@ -117,6 +118,23 @@ $currentUser = getCurrentUser();
                         <p>Chargement de votre collection...</p>
                     </div>
                 </div>
+                <?php else: ?>
+                <div class="auth-required glass-container">
+                    <div class="auth-message">
+                        <i class="fas fa-lock"></i>
+                        <h2>Authentification requise</h2>
+                        <p>Vous devez être connecté pour accéder à votre collection personnelle.</p>
+                        <div class="auth-actions">
+                            <a href="auth/login.php" class="btn glass-button primary">
+                                <i class="fas fa-sign-in-alt"></i> Se connecter
+                            </a>
+                            <a href="auth/register.php" class="btn glass-button">
+                                <i class="fas fa-user-plus"></i> S'inscrire
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <?php endif; ?>
             </div>
 
             <!-- Vue Recherche -->
@@ -163,6 +181,7 @@ $currentUser = getCurrentUser();
 
             <!-- Vue Statistiques -->
             <div id="stats-view" class="view">
+                <?php if ($currentUser): ?>
                 <div class="stats-container glass-container">
                     <h2 class="text-gradient">Statistiques de ma collection</h2>
                     <div class="stats-grid">
@@ -218,6 +237,23 @@ $currentUser = getCurrentUser();
                         </div>
                     </div>
                 </div>
+                <?php else: ?>
+                <div class="auth-required glass-container">
+                    <div class="auth-message">
+                        <i class="fas fa-lock"></i>
+                        <h2>Authentification requise</h2>
+                        <p>Vous devez être connecté pour voir les statistiques de votre collection.</p>
+                        <div class="auth-actions">
+                            <a href="auth/login.php" class="btn glass-button primary">
+                                <i class="fas fa-sign-in-alt"></i> Se connecter
+                            </a>
+                            <a href="auth/register.php" class="btn glass-button">
+                                <i class="fas fa-user-plus"></i> S'inscrire
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <?php endif; ?>
             </div>
 
             <!-- Vue Synchronisation -->

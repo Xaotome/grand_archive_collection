@@ -23,6 +23,13 @@ function handleError($message, $type = 'general_error') {
     exit;
 }
 
+// Fonction pour récupérer l'utilisateur connecté
+function getCurrentUserId() {
+    require_once __DIR__ . '/../auth/session.php';
+    $currentUser = getCurrentUser();
+    return $currentUser ? $currentUser['id'] : null;
+}
+
 try {
     require_once __DIR__ . '/../classes/Card.php';
     require_once __DIR__ . '/../classes/Collection.php';
@@ -38,21 +45,24 @@ try {
         );
     }
     
+    // Récupérer l'utilisateur connecté
+    $currentUserId = getCurrentUserId();
+    
     $method = $_SERVER['REQUEST_METHOD'];
     $action = $_GET['action'] ?? 'search';
 
     switch ($method) {
         case 'GET':
-            handleGet($card, $collection, $action);
+            handleGet($card, $collection, $action, $currentUserId);
             break;
         case 'POST':
-            handlePost($card, $collection, $action);
+            handlePost($card, $collection, $action, $currentUserId);
             break;
         case 'PUT':
-            handlePut($card, $collection, $action);
+            handlePut($card, $collection, $action, $currentUserId);
             break;
         case 'DELETE':
-            handleDelete($collection, $action);
+            handleDelete($collection, $action, $currentUserId);
             break;
         default:
             http_response_code(405);
@@ -76,7 +86,7 @@ try {
     handleError($errorMessage, $errorType);
 }
 
-function handleGet($card, $collection, $action) {
+function handleGet($card, $collection, $action, $currentUserId) {
     switch ($action) {
         case 'search':
             $params = [
@@ -90,8 +100,9 @@ function handleGet($card, $collection, $action) {
             ];
             
             
-            $results = $card->searchCards($params);
+            $results = $card->searchCards($params, $currentUserId);
             error_log("API Search - Params: " . print_r($params, true));
+            error_log("API Search - User ID: " . ($currentUserId ?? 'null'));
             error_log("API Search - Results count: " . count($results));
             echo json_encode(['success' => true, 'data' => $results]);
             break;
@@ -104,7 +115,7 @@ function handleGet($card, $collection, $action) {
                 return;
             }
             
-            $cardData = $card->getCardById($uuid);
+            $cardData = $card->getCardById($uuid, $currentUserId);
             if (!$cardData) {
                 http_response_code(404);
                 echo json_encode(['success' => false, 'error' => 'Carte non trouvée']);
@@ -115,6 +126,12 @@ function handleGet($card, $collection, $action) {
             break;
 
         case 'collection':
+            if (!$currentUserId) {
+                http_response_code(401);
+                echo json_encode(['success' => false, 'error' => 'Utilisateur non connecté']);
+                return;
+            }
+            
             $filters = [
                 'name' => $_GET['name'] ?? '',
                 'set_prefix' => $_GET['set'] ?? '',
@@ -128,7 +145,8 @@ function handleGet($card, $collection, $action) {
                 'limit' => isset($_GET['limit']) ? (int)$_GET['limit'] : null
             ];
             
-            $myCollection = $collection->getMyCollection($filters);
+            $myCollection = $collection->getMyCollection($filters, $currentUserId);
+            error_log("API Collection - User ID: " . $currentUserId);
             error_log("API Collection - Filters: " . print_r($filters, true));
             error_log("API Collection - Results count: " . count($myCollection));
             echo json_encode(['success' => true, 'data' => $myCollection]);
@@ -182,29 +200,50 @@ function handleGet($card, $collection, $action) {
             break;
 
         case 'collection_classes':
-            $classes = $collection->getCollectionClasses();
+            if (!$currentUserId) {
+                echo json_encode(['success' => true, 'data' => []]);
+                return;
+            }
+            $classes = $collection->getCollectionClasses($currentUserId);
             echo json_encode(['success' => true, 'data' => $classes]);
             break;
 
         case 'collection_elements':
-            $elements = $collection->getCollectionElements();
+            if (!$currentUserId) {
+                echo json_encode(['success' => true, 'data' => []]);
+                return;
+            }
+            $elements = $collection->getCollectionElements($currentUserId);
             echo json_encode(['success' => true, 'data' => $elements]);
             break;
 
         case 'collection_sets':
-            $sets = $collection->getCollectionSets();
+            if (!$currentUserId) {
+                echo json_encode(['success' => true, 'data' => []]);
+                return;
+            }
+            $sets = $collection->getCollectionSets($currentUserId);
             echo json_encode(['success' => true, 'data' => $sets]);
             break;
 
         case 'recent':
+            if (!$currentUserId) {
+                echo json_encode(['success' => true, 'data' => []]);
+                return;
+            }
             $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 10;
-            $recent = $collection->getRecentlyAdded($limit);
+            $recent = $collection->getRecentlyAdded($limit, $currentUserId);
             echo json_encode(['success' => true, 'data' => $recent]);
             break;
 
         case 'export':
+            if (!$currentUserId) {
+                http_response_code(401);
+                echo json_encode(['success' => false, 'error' => 'Utilisateur non connecté']);
+                return;
+            }
             $format = $_GET['format'] ?? 'json';
-            $data = $collection->exportCollection($format);
+            $data = $collection->exportCollection($format, $currentUserId);
             
             if ($format === 'csv') {
                 header('Content-Type: text/csv');
@@ -261,11 +300,17 @@ function handleGet($card, $collection, $action) {
     }
 }
 
-function handlePost($card, $collection, $action) {
+function handlePost($card, $collection, $action, $currentUserId) {
     $input = json_decode(file_get_contents('php://input'), true);
     
     switch ($action) {
         case 'add_to_collection':
+            if (!$currentUserId) {
+                http_response_code(401);
+                echo json_encode(['success' => false, 'error' => 'Utilisateur non connecté']);
+                return;
+            }
+            
             $cardUuid = $input['card_uuid'] ?? '';
             $editionUuid = $input['edition_uuid'] ?? '';
             $quantity = $input['quantity'] ?? 1;
@@ -278,7 +323,7 @@ function handlePost($card, $collection, $action) {
                 return;
             }
             
-            $success = $collection->addToCollection($cardUuid, $editionUuid, $quantity, $isFoil, $options);
+            $success = $collection->addToCollection($cardUuid, $editionUuid, $quantity, $isFoil, $options, $currentUserId);
             echo json_encode(['success' => $success]);
             break;
 
@@ -324,11 +369,17 @@ function handlePost($card, $collection, $action) {
     }
 }
 
-function handlePut($card, $collection, $action) {
+function handlePut($card, $collection, $action, $currentUserId) {
     $input = json_decode(file_get_contents('php://input'), true);
     
     switch ($action) {
         case 'update_quantity':
+            if (!$currentUserId) {
+                http_response_code(401);
+                echo json_encode(['success' => false, 'error' => 'Utilisateur non connecté']);
+                return;
+            }
+            
             $cardUuid = $input['card_uuid'] ?? '';
             $editionUuid = $input['edition_uuid'] ?? '';
             $isFoil = $input['is_foil'] ?? false;
@@ -341,7 +392,7 @@ function handlePut($card, $collection, $action) {
                 return;
             }
             
-            $success = $collection->updateQuantity($cardUuid, $editionUuid, $isFoil, $newQuantity, $isCsr);
+            $success = $collection->updateQuantity($cardUuid, $editionUuid, $isFoil, $newQuantity, $isCsr, $currentUserId);
             echo json_encode(['success' => $success]);
             break;
 
@@ -351,11 +402,17 @@ function handlePut($card, $collection, $action) {
     }
 }
 
-function handleDelete($collection, $action) {
+function handleDelete($collection, $action, $currentUserId) {
     $input = json_decode(file_get_contents('php://input'), true);
     
     switch ($action) {
         case 'remove_from_collection':
+            if (!$currentUserId) {
+                http_response_code(401);
+                echo json_encode(['success' => false, 'error' => 'Utilisateur non connecté']);
+                return;
+            }
+            
             $cardUuid = $input['card_uuid'] ?? '';
             $editionUuid = $input['edition_uuid'] ?? '';
             $isFoil = $input['is_foil'] ?? false;
@@ -367,7 +424,7 @@ function handleDelete($collection, $action) {
                 return;
             }
             
-            $success = $collection->removeFromCollection($cardUuid, $editionUuid, $isFoil, $quantity);
+            $success = $collection->removeFromCollection($cardUuid, $editionUuid, $isFoil, false, $currentUserId);
             echo json_encode(['success' => $success]);
             break;
 
