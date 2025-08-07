@@ -483,10 +483,10 @@ class CollectionManager {
         
         if (isCsr) {
             cardTypeClass = 'csr-card';
-            typeIndicator = '<div class="csr-indicator">CSR</div>';
+            typeIndicator = '<div class="card-type-badge csr">CSR</div>';
         } else if (isFoil) {
             cardTypeClass = 'foil-card';
-            typeIndicator = '<div class="foil-indicator">FOIL</div>';
+            typeIndicator = '<div class="card-type-badge foil">FOIL</div>';
         }
 
         // Debug pour vérifier les UUIDs
@@ -729,12 +729,12 @@ class CollectionManager {
         // Utilise un lookahead/lookbehind négatif pour éviter les conflits avec du HTML existant
         const boldRegex = /\*\*([^*]+(?:\*(?!\*)[^*]*)*)\*\*/g;
         
-        // Remplacer tous les **texte** par <strong>texte</strong>
+        // Remplacer tous les **texte** par <strong>texte</strong> avec espaces
         const processed = text.replace(boldRegex, (match, content) => {
             // S'assurer que le contenu n'est pas vide et nettoyer les espaces
             const cleanContent = content.trim();
             if (cleanContent) {
-                return `<strong>${cleanContent}</strong>`;
+                return ` <strong>${cleanContent}</strong> `;
             }
             return match; // Retourner le texte original si contenu vide
         });

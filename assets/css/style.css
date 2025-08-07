@@ -421,30 +421,6 @@ body {
     text-align: center;
 }
 
-.foil-indicator, .csr-indicator {
-    position: absolute;
-    bottom: var(--space-xs);
-    left: var(--space-xs);
-    background: var(--black);
-    color: var(--white);
-    font-size: var(--font-size-xs);
-    font-weight: var(--font-weight-bold);
-    padding: 4px 8px;
-    line-height: 1;
-    border: 1px solid var(--white);
-}
-
-.foil-indicator {
-    background: linear-gradient(45deg, var(--black) 25%, var(--grey-600) 25%, var(--grey-600) 50%, var(--black) 50%, var(--black) 75%, var(--grey-600) 75%);
-    background-size: 8px 8px;
-    animation: foil-shimmer 2s infinite linear;
-}
-
-.csr-indicator {
-    background: var(--grey-700);
-    border: 2px solid var(--black);
-    box-shadow: inset 0 1px 0 var(--grey-500);
-}
 
 /* Effet foil minimaliste */
 @keyframes foil-shimmer {
@@ -452,49 +428,65 @@ body {
     100% { background-position: 16px 16px; }
 }
 
-/* Effet subtil sur les cartes foil */
+/* Effets visuels subtils pour cartes foil */
 .card-item[data-foil="true"] {
-    border-color: var(--grey-600);
     position: relative;
+    border: 2px solid #ffd700;
+    box-shadow: 0 0 8px rgba(255, 215, 0, 0.2);
+    transform: translateZ(0);
 }
 
-.card-item[data-foil="true"]::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: linear-gradient(45deg, transparent 30%, rgba(64, 64, 64, 0.1) 50%, transparent 70%);
-    pointer-events: none;
-    animation: foil-card-shimmer 3s infinite ease-in-out;
-}
-
-@keyframes foil-card-shimmer {
-    0%, 100% { opacity: 0; }
-    50% { opacity: 1; }
-}
-
-/* Effet subtil sur les cartes CSR */
+/* Effets pour cartes CSR - contour diamant fixe */
 .card-item[data-csr="true"] {
-    border-color: var(--grey-700);
-    box-shadow: 0 0 0 1px var(--grey-600);
-}
-
-.card-item[data-csr="true"] .card-image {
     position: relative;
+    border: 3px solid transparent;
+    background: linear-gradient(var(--white), var(--white)) padding-box,
+                linear-gradient(135deg, #00d4ff, #ff00ff, #ffff00, #ff8000, #00d4ff) border-box;
+    transform: translateZ(0);
 }
 
-.card-item[data-csr="true"] .card-image::after {
-    content: '';
+
+
+/* Badges pour identifier les types de cartes spéciales */
+.card-type-badge {
     position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: linear-gradient(135deg, transparent 40%, rgba(32, 32, 32, 0.15) 50%, transparent 60%);
+    bottom: 8px;
+    right: 8px;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 10px;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    z-index: 10;
     pointer-events: none;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
 }
+
+.card-type-badge.foil {
+    background: linear-gradient(45deg, #ffd700, #ffed4e);
+    color: #000;
+    border: 1px solid #e6c200;
+    animation: foil-badge-glow 2s ease-in-out infinite alternate;
+}
+
+.card-type-badge.csr {
+    background: linear-gradient(45deg, #00d4ff, #ff00ff);
+    color: #fff;
+    border: 1px solid #fff;
+}
+
+@keyframes foil-badge-glow {
+    0% { 
+        box-shadow: 0 0 5px rgba(255, 215, 0, 0.5);
+        transform: scale(1);
+    }
+    100% { 
+        box-shadow: 0 0 15px rgba(255, 215, 0, 0.8);
+        transform: scale(1.05);
+    }
+}
+
 
 .card-info {
     padding: var(--space-sm);
