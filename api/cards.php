@@ -274,7 +274,18 @@ function handleGet($card, $collection, $action, $currentUserId) {
             break;
 
         case 'sync_cards':
+            // Activer l'admin seulement pour la synchronisation
+            if (!isCurrentUserAdmin()) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'error' => 'Accès admin requis pour la synchronisation']);
+                return;
+            }
+            
             try {
+                // Augmenter les limites pour la synchronisation
+                @ini_set('max_execution_time', 300); // 5 minutes
+                @ini_set('memory_limit', '512M'); // 512MB
+                
                 $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : null;
                 $offset = isset($_GET['offset']) ? (int)$_GET['offset'] : 0;
                 
@@ -286,8 +297,8 @@ function handleGet($card, $collection, $action, $currentUserId) {
                 echo json_encode([
                     'success' => false, 
                     'error' => $e->getMessage(),
-                    'type' => 'database_connection_error',
-                    'suggestion' => 'Vérifiez que MySQL est démarré et que la base de données existe'
+                    'type' => 'sync_error',
+                    'suggestion' => 'Vérifiez les logs serveur et réessayez avec une limite plus petite'
                 ]);
             }
             break;

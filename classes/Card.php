@@ -625,12 +625,23 @@ class Card {
     }
 
     public function syncCardsFromAPI($limit = null, $offset = 0) {
+        // Utiliser la nouvelle classe optimisée
+        require_once __DIR__ . '/CardSync.php';
+        $cardSync = new CardSync();
+        return $cardSync->syncCardsFromAPI($limit, $offset);
+    }
+    
+    public function syncCardsFromAPILegacy($limit = null, $offset = 0) {
         $syncLog = [];
         $totalImported = 0;
         $totalErrors = 0;
         $totalSkipped = 0;
         
         try {
+            // Ajouter des limites PHP pour éviter les timeouts
+            @ini_set('max_execution_time', 300); // 5 minutes max
+            @ini_set('memory_limit', '256M'); // Augmenter la mémoire
+            
             // Assurer que la table sync_status existe
             $this->ensureSyncStatusTable();
             
