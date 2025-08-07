@@ -592,12 +592,13 @@ class CollectionManager {
             document.getElementById('modal-card-type').textContent = card.types || 'Inconnu';
         }
 
-        // Effet
+        // Effet avec parsing des badges
         const effectEl = document.getElementById('modal-card-effect');
+        
         if (card.effect_html) {
-            effectEl.innerHTML = card.effect_html;
+            effectEl.innerHTML = this.parseEffectBadges(card.effect_html);
         } else if (card.effect) {
-            effectEl.textContent = card.effect;
+            effectEl.innerHTML = this.parseEffectBadges(card.effect);
         } else {
             effectEl.textContent = 'Aucun effet';
         }
@@ -616,6 +617,238 @@ class CollectionManager {
         document.getElementById('card-modal').style.display = 'none';
         document.body.style.overflow = 'auto';
         this.currentCardData = null;
+    }
+
+    /**
+     * Parse les effets de cartes et transforme les éléments entre crochets en badges stylisés
+     * @param {string} effectText - Le texte d'effet à parser
+     * @returns {string} - Le texte avec les badges HTML
+     */
+    parseEffectBadges(effectText) {
+        if (!effectText || typeof effectText !== 'string') {
+            return effectText || '';
+        }
+
+        let processedText = effectText;
+
+        // 1. Convertir les badges de l'API Grand Archive (effect__bubble) vers notre style
+        if (effectText.includes('effect__bubble')) {
+            // Remplacer les <span class="effect__bubble">...</span> par nos badges custom
+            processedText = processedText.replace(
+                /<span class="effect__bubble">([^<]+)<\/span>/g, 
+                '<span class="effect-badge">$1</span>'
+            );
+        }
+        
+        // 1.5. Convertir les labels de l'API Grand Archive (effect__label) vers du gras
+        if (effectText.includes('effect__label')) {
+            // Remplacer les <span class="effect__label">...</span> par <strong>
+            processedText = processedText.replace(
+                /<span class="effect__label">([^<]+)<\/span>/g, 
+                '<strong>$1</strong>'
+            );
+        }
+        
+        // 2. Traiter les données en texte brut (escape HTML si nécessaire)
+        else if (!effectText.includes('<') || !effectText.includes('>')) {
+            processedText = this.escapeHtml(effectText);
+        }
+
+        // 3. Convertir les crochets [...]  en badges (pour données locales)
+        const bracketRegex = /\[([^\]]+)\]/g;
+        const matches = processedText.match(bracketRegex);
+        
+        if (matches) {
+            processedText = processedText.replace(bracketRegex, (match, content) => {
+                return `<span class="effect-badge">${content.trim()}</span>`;
+            });
+        }
+
+        // 4. Convertir les textes **gras** en balises <strong>
+        processedText = this.parseBoldText(processedText);
+
+        // 5. Convertir les champs spéciaux en icônes et styles
+        processedText = this.parseSpecialFields(processedText);
+
+        // 6. Formater automatiquement avec des sauts de ligne intelligents
+        processedText = this.formatEffectText(processedText);
+
+        return processedText;
+    }
+
+    /**
+     * Parse les champs spéciaux et les convertit en icônes et styles appropriés
+     * @param {string} text - Le texte à parser
+     * @returns {string} - Le texte avec les icônes et styles
+     */
+    parseSpecialFields(text) {
+        if (!text || typeof text !== 'string') {
+            return text || '';
+        }
+
+        let processed = text;
+
+        // 1. Convertir [POWER] en icône épée
+        processed = processed.replace(
+            /\[POWER\]/gi,
+            '<span class="effect__icon effect__icon--sword" title="Power"></span>'
+        );
+
+        // 2. Convertir [REST] en icône repos
+        processed = processed.replace(
+            /\[REST\]/gi,
+            '<span class="effect__icon effect__icon--rest" title="Rest"></span>'
+        );
+
+        // 3. Convertir [LIFE] en icône cœur
+        processed = processed.replace(
+            /\[LIFE\]/gi,
+            '<span class="effect__icon effect__icon--heart" title="Life"></span>'
+        );
+
+        // 4. Convertir les chiffres entre parenthèses (X) en coûts stylisés
+        processed = processed.replace(
+            /\((\d+)\)/g,
+            '<span class="effect-cost">$1</span>'
+        );
+
+        return processed;
+    }
+
+    /**
+     * Parse les textes entre ** pour les convertir en gras
+     * @param {string} text - Le texte à parser
+     * @returns {string} - Le texte avec les balises <strong>
+     */
+    parseBoldText(text) {
+        if (!text || typeof text !== 'string') {
+            return text || '';
+        }
+
+        // Regex pour capturer le texte entre **texte**
+        // Utilise un lookahead/lookbehind négatif pour éviter les conflits avec du HTML existant
+        const boldRegex = /\*\*([^*]+(?:\*(?!\*)[^*]*)*)\*\*/g;
+        
+        // Remplacer tous les **texte** par <strong>texte</strong>
+        const processed = text.replace(boldRegex, (match, content) => {
+            // S'assurer que le contenu n'est pas vide et nettoyer les espaces
+            const cleanContent = content.trim();
+            if (cleanContent) {
+                return `<strong>${cleanContent}</strong>`;
+            }
+            return match; // Retourner le texte original si contenu vide
+        });
+
+        return processed;
+    }
+
+    /**
+     * Formate automatiquement le texte d'effet avec des sauts de ligne intelligents
+     * @param {string} text - Le texte à formater
+     * @returns {string} - Le texte formaté avec <br> aux endroits appropriés
+     */
+    formatEffectText(text) {
+        if (!text || typeof text !== 'string') {
+            return text;
+        }
+
+        let formatted = text;
+
+        // RÈGLES SPÉCIALES POUR CLASS BONUS
+        // Règle 1: Class Bonus + phrase suivante = même ligne (pas de saut)
+        // Règle 2: Class Bonus + Class Bonus = juste un espace (pas de saut)
+        
+        // Patterns pour identifier les points de saut de ligne appropriés
+        const lineBreakPatterns = [
+            // Après une phrase se terminant par un point, suivie d'un badge (sauf Class Bonus)
+            /(\.)(\s*)(<span class="effect-badge">(?!Class Bonus))/g,
+            
+            // Après un badge suivi d'une phrase complète qui commence par une majuscule
+            // EXCEPTION: Ne pas couper si c'est Class Bonus suivi d'une phrase
+            /(<span class="effect-badge">(?!Class Bonus)[^<]*<\/span>)(\s*)([A-Z][^<]*?[.!?])(\s*)(<span class="effect-badge">)/g,
+            
+            // Après une parenthèse fermante suivie d'un badge (sauf Class Bonus) ou d'une phrase
+            /(\))(\s*)(<span class="effect-badge">(?!Class Bonus)|[A-Z])/g,
+            
+            // Après certains badges spécifiques qui marquent souvent de nouvelles sections
+            // EXCEPTION: Exclure Class Bonus de cette règle
+            /(<span class="effect-badge">(?:On Enter|On Exit|Level \d+|Memory \d+\+?|Activate)<\/span>)(\s*)/g,
+            
+            // Après les reminder texts (texte entre parenthèses long)
+            /(effect__reminder">[^<]*<\/span>)(\s*)(<span class="effect-badge">|[A-Z])/g,
+            
+            // Après une phrase se terminant par un point, suivie d'un Class Bonus = GARDER sur même ligne
+            // (Cette règle inverse la première pour Class Bonus)
+            
+            // Après un badge NON-Class Bonus, suivi d'un Class Bonus = saut de ligne
+            /(<span class="effect-badge">(?!Class Bonus)[^<]*<\/span>)(\s*)([.!?]?)(\s*)(<span class="effect-badge">Class Bonus<\/span>)/g,
+        ];
+
+        // Appliquer chaque pattern avec gestion spéciale pour Class Bonus
+        lineBreakPatterns.forEach((pattern, index) => {
+            if (pattern.source.includes('(?:On Enter|On Exit|')) {
+                // Pattern pour badges de début de section (sauf Class Bonus)
+                formatted = formatted.replace(pattern, (match, badge, space) => {
+                    return badge + '<br><br>';
+                });
+            } else if (pattern.source.includes('effect__reminder')) {
+                // Pattern pour les reminder texts
+                formatted = formatted.replace(pattern, '$1<br>$3');
+            } else if (pattern.source.includes('(?!Class Bonus)|[A-Z]')) {
+                // Pattern pour après parenthèse (sauf Class Bonus)
+                formatted = formatted.replace(pattern, '$1<br>$3');
+            } else if (pattern.source.includes('(?!Class Bonus)[^<]*<\/span>') && pattern.source.includes('[A-Z][^<]*?[.!?]')) {
+                // Pattern complexe avec phrase complète (sauf Class Bonus)
+                formatted = formatted.replace(pattern, '$1<br>$4$5');
+            } else if (pattern.source.includes('(?!Class Bonus)') && pattern.source.includes('(\\.)')) {
+                // Pattern simple après point (sauf Class Bonus)
+                formatted = formatted.replace(pattern, '$1<br>$3');
+            } else if (pattern.source.includes('(?!Class Bonus)[^<]*<\/span>.*Class Bonus')) {
+                // Pattern spécial: badge non-Class Bonus suivi de Class Bonus
+                formatted = formatted.replace(pattern, '$1$3<br>$5');
+            }
+        });
+
+        // RÈGLES SPÉCIALES POST-TRAITEMENT POUR CLASS BONUS
+        
+        // Règle 1: Si Class Bonus est suivi d'un <br> puis d'une phrase normale, supprimer le <br>
+        formatted = formatted.replace(
+            /(<span class="effect-badge">Class Bonus<\/span>)\s*<br>\s*([a-z])/gi,
+            '$1 $2'
+        );
+
+        // Règle 2: Si deux Class Bonus se suivent avec <br>, remplacer par un espace
+        formatted = formatted.replace(
+            /(<span class="effect-badge">Class Bonus<\/span>)\s*<br>\s*(<span class="effect-badge">Class Bonus<\/span>)/g,
+            '$1 $2'
+        );
+
+        // Règle 3: Class Bonus en fin de phrase + Class Bonus = même ligne
+        formatted = formatted.replace(
+            /(Class Bonus<\/span>[^<]*?[.!?])\s*<br>\s*(<span class="effect-badge">Class Bonus<\/span>)/g,
+            '$1 $2'
+        );
+
+        // Nettoyer les espaces multiples et <br> en trop
+        formatted = formatted
+            .replace(/\s*<br>\s*<br>\s*/g, '<br><br>') // Max 2 <br> consécutifs
+            .replace(/\s*<br>\s*/g, '<br>') // Nettoyer les espaces autour des <br>
+            .replace(/<br>+$/g, '') // Supprimer les <br> en fin
+            .replace(/^<br>+/g, '') // Supprimer les <br> au début
+            .trim();
+
+        return formatted;
+    }
+
+    /**
+     * Échappe les caractères HTML pour éviter les injections XSS
+     * @param {string} text - Le texte à échapper
+     * @returns {string} - Le texte échappé
+     */
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 
     async updateCardQuantity(action) {

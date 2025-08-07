@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Formatage des Effets</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+    <style>
+        body {
+            padding: 20px;
+            font-family: Inter, sans-serif;
+            background: #f5f5f5;
+        }
+        .test-container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .test-case {
+            margin: 20px 0;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .test-input {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            border: 1px solid #dee2e6;
+            font-family: monospace;
+            font-size: 0.9em;
+            margin: 10px 0;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .test-output {
+            background: white;
+            padding: 15px;
+            border: 2px solid #000;
+            border-radius: 4px;
+            margin: 10px 0;
+            line-height: 1.6;
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        h3 {
+            color: #333;
+            border-bottom: 2px solid #000;
+            padding-bottom: 5px;
+        }
+        button {
+            background: #000;
+            color: #fff;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 10px 5px 10px 0;
+        }
+        button:hover {
+            background: #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🧪 Test du Formatage Automatique des Effets</h1>
+        
+        <div class="test-case">
+            <h3>Cas 1 : Effet simple avec Class Bonus et effect__label</h3>
+            <div class="test-input" id="input-1">
+                <span class="effect-badge">Class Bonus</span>  <span class="effect-badge">Memory 4+</span>  Academy Attendant gets <span class="effect__label">+1</span><span class="effect__icon effect__icon--sword"></span>. <span class="effect__reminder">(Apply this effect only if your champion's class matches this card's class and only if there are four or more cards in your memory.)</span>
+            </div>
+            <div class="test-output" id="output-1"></div>
+        </div>
+
+        <div class="test-case">
+            <h3>Cas 2 : Effet avec On Enter et Level</h3>
+            <div class="test-input" id="input-2">
+                <span class="effect-badge">On Enter</span>: Draw a card. <span class="effect-badge">Level 2</span>: Gain 1 memory. <span class="effect-badge">Class Bonus</span>: Draw an additional card.
+            </div>
+            <div class="test-output" id="output-2"></div>
+        </div>
+
+        <div class="test-case">
+            <h3>Cas 3 : Effet complexe avec reminder text</h3>
+            <div class="test-input" id="input-3">
+                <span class="effect-badge">Activate</span>: Deal 2 damage to target ally. <span class="effect__reminder">(You may activate this ability by paying its cost and tapping this card.)</span> <span class="effect-badge">Level 3</span>: Deal 3 damage instead.
+            </div>
+            <div class="test-output" id="output-3"></div>
+        </div>
+
+        <div class="test-case">
+            <h3>Cas 4 : Class Bonus suivi d'une phrase (même ligne)</h3>
+            <div class="test-input" id="input-4">
+                Draw a card. <span class="effect-badge">Class Bonus</span> Draw an additional card. This card gets +1 power.
+            </div>
+            <div class="test-output" id="output-4"></div>
+        </div>
+
+        <div class="test-case">
+            <h3>Cas 5 : Deux Class Bonus consécutifs (même ligne)</h3>
+            <div class="test-input" id="input-5">
+                <span class="effect-badge">Class Bonus</span> <span class="effect-badge">Class Bonus</span> This ally gets +2 power and draws a card.
+            </div>
+            <div class="test-output" id="output-5"></div>
+        </div>
+
+        <div class="test-case">
+            <h3>Cas 6 : Class Bonus avec autres badges</h3>
+            <div class="test-input" id="input-6">
+                <span class="effect-badge">Memory 2+</span> <span class="effect-badge">Class Bonus</span> Draw a card. <span class="effect-badge">On Enter</span> Gain 1 memory. <span class="effect-badge">Class Bonus</span> Deal 1 damage.
+            </div>
+            <div class="test-output" id="output-6"></div>
+        </div>
+
+        <div class="test-case">
+            <h3>Cas 7 : Texte avec **gras** simple</h3>
+            <div class="test-input" id="input-7">
+                Deal **2 damage** to target. This effect cannot be **prevented** or **blocked**.
+            </div>
+            <div class="test-output" id="output-7"></div>
+        </div>
+
+        <div class="test-case">
+            <h3>Cas 8 : **Gras** avec badges et Class Bonus</h3>
+            <div class="test-input" id="input-8">
+                <span class="effect-badge">Class Bonus</span> Deal **additional damage**. <span class="effect-badge">Level 2</span> This ally gets **+2 power** and **cannot be blocked**.
+            </div>
+            <div class="test-output" id="output-8"></div>
+        </div>
+
+        <div class="test-case">
+            <h3>Cas 9 : Combinaison **gras**, badges et Class Bonus</h3>
+            <div class="test-input" id="input-9">
+                Draw a **powerful** card. <span class="effect-badge">Class Bonus</span> Draw an **additional** card. <span class="effect-badge">On Enter</span> This ally gets **+1 power** until **end of turn**.
+            </div>
+            <div class="test-output" id="output-9"></div>
+        </div>
+
+        <div class="test-case">
+            <h3>Cas 10 : effect__label de l'API (devrait devenir gras)</h3>
+            <div class="test-input" id="input-10">
+                Deal <span class="effect__label">2 damage</span> to target. <span class="effect-badge">Class Bonus</span> Deal <span class="effect__label">3 damage</span> instead. This effect cannot be <span class="effect__label">prevented</span>.
+            </div>
+            <div class="test-output" id="output-10"></div>
+        </div>
+
+        <div class="test-case">
+            <h3>Cas 11 : Icônes [POWER], [REST], [LIFE]</h3>
+            <div class="test-input" id="input-11">
+                This ally gets +2[POWER]. [REST] to gain 1[LIFE]. Sacrifice this ally to deal [POWER] damage.
+            </div>
+            <div class="test-output" id="output-11"></div>
+        </div>
+
+        <div class="test-case">
+            <h3>Cas 12 : Coûts (X) avec fond jaune</h3>
+            <div class="test-input" id="input-12">
+                Pay (2) to activate. <span class="effect-badge">Level 3</span> Pay (4) instead. This costs (1) less for each ally you control.
+            </div>
+            <div class="test-output" id="output-12"></div>
+        </div>
+
+        <div class="test-case">
+            <h3>Cas 13 : Combinaison complète - badges, gras, icônes, coûts</h3>
+            <div class="test-input" id="input-13">
+                <span class="effect-badge">Class Bonus</span> Pay (3) and [REST] to deal **2 damage**. This ally gets +1[POWER] and 1[LIFE]. <span class="effect-badge">On Enter</span> Gain (1) memory.
+            </div>
+            <div class="test-output" id="output-13"></div>
+        </div>
+
+        <button onclick="testAll()">🚀 Tester tous les cas</button>
+        <button onclick="clearAll()">🧹 Effacer</button>
+    </div>
+
+    <script>
+        // Copie des fonctions de formatage pour test
+        function parseEffectBadges(effectText) {
+            if (!effectText || typeof effectText !== 'string') {
+                return effectText || '';
+            }
+
+            let processedText = effectText;
+
+            // 1. Convertir les badges de l'API Grand Archive (effect__bubble) vers notre style
+            if (effectText.includes('effect__bubble')) {
+                processedText = processedText.replace(
+                    /<span class="effect__bubble">([^<]+)<\/span>/g, 
+                    '<span class="effect-badge">$1</span>'
+                );
+            }
+            
+            // 1.5. Convertir les labels de l'API Grand Archive (effect__label) vers du gras
+            if (effectText.includes('effect__label')) {
+                // Remplacer les <span class="effect__label">...</span> par <strong>
+                processedText = processedText.replace(
+                    /<span class="effect__label">([^<]+)<\/span>/g, 
+                    '<strong>$1</strong>'
+                );
+            }
+            
+            // 2. Traiter les données en texte brut (escape HTML si nécessaire)
+            else if (!effectText.includes('<') || !effectText.includes('>')) {
+                processedText = escapeHtml(effectText);
+            }
+
+            // 3. Convertir les crochets [...]  en badges (pour données locales)
+            const bracketRegex = /\[([^\]]+)\]/g;
+            const matches = processedText.match(bracketRegex);
+            
+            if (matches) {
+                processedText = processedText.replace(bracketRegex, (match, content) => {
+                    return `<span class="effect-badge">${content.trim()}</span>`;
+                });
+            }
+
+            // 4. Convertir les textes **gras** en balises <strong>
+            processedText = parseBoldText(processedText);
+
+            // 5. Convertir les champs spéciaux en icônes et styles
+            processedText = parseSpecialFields(processedText);
+
+            // 6. Formater automatiquement avec des sauts de ligne intelligents
+            processedText = formatEffectText(processedText);
+
+            return processedText;
+        }
+
+        function parseSpecialFields(text) {
+            if (!text || typeof text !== 'string') {
+                return text || '';
+            }
+
+            let processed = text;
+
+            // 1. Convertir [POWER] en icône épée
+            processed = processed.replace(
+                /\[POWER\]/gi,
+                '<span class="effect__icon effect__icon--sword" title="Power"></span>'
+            );
+
+            // 2. Convertir [REST] en icône repos
+            processed = processed.replace(
+                /\[REST\]/gi,
+                '<span class="effect__icon effect__icon--rest" title="Rest"></span>'
+            );
+
+            // 3. Convertir [LIFE] en icône cœur
+            processed = processed.replace(
+                /\[LIFE\]/gi,
+                '<span class="effect__icon effect__icon--heart" title="Life"></span>'
+            );
+
+            // 4. Convertir les chiffres entre parenthèses (X) en coûts stylisés
+            processed = processed.replace(
+                /\((\d+)\)/g,
+                '<span class="effect-cost">$1</span>'
+            );
+
+            return processed;
+        }
+
+        function parseBoldText(text) {
+            if (!text || typeof text !== 'string') {
+                return text || '';
+            }
+
+            // Regex pour capturer le texte entre **texte**
+            const boldRegex = /\*\*([^*]+(?:\*(?!\*)[^*]*)*)\*\*/g;
+            
+            // Remplacer tous les **texte** par <strong>texte</strong>
+            const processed = text.replace(boldRegex, (match, content) => {
+                // S'assurer que le contenu n'est pas vide et nettoyer les espaces
+                const cleanContent = content.trim();
+                if (cleanContent) {
+                    return `<strong>${cleanContent}</strong>`;
+                }
+                return match; // Retourner le texte original si contenu vide
+            });
+
+            return processed;
+        }
+
+        function formatEffectText(text) {
+            if (!text || typeof text !== 'string') {
+                return text;
+            }
+
+            let formatted = text;
+
+            // RÈGLES SPÉCIALES POUR CLASS BONUS
+            // Règle 1: Class Bonus + phrase suivante = même ligne (pas de saut)
+            // Règle 2: Class Bonus + Class Bonus = juste un espace (pas de saut)
+            
+            // Patterns pour identifier les points de saut de ligne appropriés
+            const lineBreakPatterns = [
+                // Après une phrase se terminant par un point, suivie d'un badge (sauf Class Bonus)
+                /(\.)(\s*)(<span class="effect-badge">(?!Class Bonus))/g,
+                
+                // Après un badge suivi d'une phrase complète qui commence par une majuscule
+                // EXCEPTION: Ne pas couper si c'est Class Bonus suivi d'une phrase
+                /(<span class="effect-badge">(?!Class Bonus)[^<]*<\/span>)(\s*)([A-Z][^<]*?[.!?])(\s*)(<span class="effect-badge">)/g,
+                
+                // Après une parenthèse fermante suivie d'un badge (sauf Class Bonus) ou d'une phrase
+                /(\))(\s*)(<span class="effect-badge">(?!Class Bonus)|[A-Z])/g,
+                
+                // Après certains badges spécifiques qui marquent souvent de nouvelles sections
+                // EXCEPTION: Exclure Class Bonus de cette règle
+                /(<span class="effect-badge">(?:On Enter|On Exit|Level \d+|Memory \d+\+?|Activate)<\/span>)(\s*)/g,
+                
+                // Après les reminder texts (texte entre parenthèses long)
+                /(effect__reminder">[^<]*<\/span>)(\s*)(<span class="effect-badge">|[A-Z])/g,
+                
+                // Après un badge NON-Class Bonus, suivi d'un Class Bonus = saut de ligne
+                /(<span class="effect-badge">(?!Class Bonus)[^<]*<\/span>)(\s*)([.!?]?)(\s*)(<span class="effect-badge">Class Bonus<\/span>)/g,
+            ];
+
+            // Appliquer chaque pattern avec gestion spéciale pour Class Bonus
+            lineBreakPatterns.forEach((pattern, index) => {
+                if (pattern.source.includes('(?:On Enter|On Exit|')) {
+                    // Pattern pour badges de début de section (sauf Class Bonus)
+                    formatted = formatted.replace(pattern, (match, badge, space) => {
+                        return badge + '<br><br>';
+                    });
+                } else if (pattern.source.includes('effect__reminder')) {
+                    // Pattern pour les reminder texts
+                    formatted = formatted.replace(pattern, '$1<br>$3');
+                } else if (pattern.source.includes('(?!Class Bonus)|[A-Z]')) {
+                    // Pattern pour après parenthèse (sauf Class Bonus)
+                    formatted = formatted.replace(pattern, '$1<br>$3');
+                } else if (pattern.source.includes('(?!Class Bonus)[^<]*<\/span>') && pattern.source.includes('[A-Z][^<]*?[.!?]')) {
+                    // Pattern complexe avec phrase complète (sauf Class Bonus)
+                    formatted = formatted.replace(pattern, '$1<br>$4$5');
+                } else if (pattern.source.includes('(?!Class Bonus)') && pattern.source.includes('(\\.)')) {
+                    // Pattern simple après point (sauf Class Bonus)
+                    formatted = formatted.replace(pattern, '$1<br>$3');
+                } else if (pattern.source.includes('(?!Class Bonus)[^<]*<\/span>.*Class Bonus')) {
+                    // Pattern spécial: badge non-Class Bonus suivi de Class Bonus
+                    formatted = formatted.replace(pattern, '$1$3<br>$5');
+                }
+            });
+
+            // RÈGLES SPÉCIALES POST-TRAITEMENT POUR CLASS BONUS
+            
+            // Règle 1: Si Class Bonus est suivi d'un <br> puis d'une phrase normale, supprimer le <br>
+            formatted = formatted.replace(
+                /(<span class="effect-badge">Class Bonus<\/span>)\s*<br>\s*([a-z])/gi,
+                '$1 $2'
+            );
+
+            // Règle 2: Si deux Class Bonus se suivent avec <br>, remplacer par un espace
+            formatted = formatted.replace(
+                /(<span class="effect-badge">Class Bonus<\/span>)\s*<br>\s*(<span class="effect-badge">Class Bonus<\/span>)/g,
+                '$1 $2'
+            );
+
+            // Règle 3: Class Bonus en fin de phrase + Class Bonus = même ligne
+            formatted = formatted.replace(
+                /(Class Bonus<\/span>[^<]*?[.!?])\s*<br>\s*(<span class="effect-badge">Class Bonus<\/span>)/g,
+                '$1 $2'
+            );
+
+            // Nettoyer les espaces multiples et <br> en trop
+            formatted = formatted
+                .replace(/\s*<br>\s*<br>\s*/g, '<br><br>') // Max 2 <br> consécutifs
+                .replace(/\s*<br>\s*/g, '<br>') // Nettoyer les espaces autour des <br>
+                .replace(/<br>+$/g, '') // Supprimer les <br> en fin
+                .replace(/^<br>+/g, '') // Supprimer les <br> au début
+                .trim();
+
+            return formatted;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function testAll() {
+            for (let i = 1; i <= 13; i++) {
+                const inputEl = document.getElementById(`input-${i}`);
+                const outputEl = document.getElementById(`output-${i}`);
+                
+                if (inputEl && outputEl) {
+                    const input = inputEl.innerHTML;
+                    const result = parseEffectBadges(input);
+                    outputEl.innerHTML = result;
+                    
+                    console.log(`=== TEST CASE ${i} ===`);
+                    console.log('Input:', input);
+                    console.log('Output:', result);
+                }
+            }
+        }
+
+        function clearAll() {
+            for (let i = 1; i <= 13; i++) {
+                const outputEl = document.getElementById(`output-${i}`);
+                if (outputEl) {
+                    outputEl.innerHTML = '';
+                }
+            }
+        }
+
+        // Auto-run tests on load
+        window.onload = function() {
+            testAll();
+        };
+    </script>
+</body>
+</html>
