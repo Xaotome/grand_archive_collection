@@ -223,10 +223,16 @@ class API {
 
     // Effectuer une requête vers l'API JustTCG via le proxy
     async justTCGRequest(endpoint, options = {}) {
-        const proxyUrl = `${this.baseUrl}/justtcg_proxy.php?endpoint=${encodeURIComponent(endpoint)}`;
+        const proxyUrl = `${this.baseUrl}/justtcg_simple_proxy.php?endpoint=${encodeURIComponent(endpoint)}`;
 
         try {
-            const response = await fetch(proxyUrl);
+            const response = await fetch(proxyUrl, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                }
+            });
             
             if (!response.ok) {
                 throw new Error(`JustTCG API error! status: ${response.status}`);
