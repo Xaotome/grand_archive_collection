@@ -12,7 +12,8 @@
       "WebFetch(domain:localhost)",
       "Bash(systemctl status:*)",
       "Bash(service mysql:*)",
-      "WebFetch(domain:www.balenciaga.com)"
+      "WebFetch(domain:www.balenciaga.com)",
+      "WebFetch(domain:thmspcrx.dev)"
     ],
     "deny": []
   }

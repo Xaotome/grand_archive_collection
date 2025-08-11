@@ -221,21 +221,12 @@ class API {
 
     // === JUSTTCG API METHODS ===
 
-    // Effectuer une requête vers l'API JustTCG
+    // Effectuer une requête vers l'API JustTCG via le proxy
     async justTCGRequest(endpoint, options = {}) {
-        const url = `${this.justTCGApiUrl}${endpoint}`;
-        const defaultOptions = {
-            headers: {
-                'Authorization': `Bearer ${this.justTCGApiKey}`,
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-            },
-        };
-
-        const config = { ...defaultOptions, ...options };
+        const proxyUrl = `${this.baseUrl}/justtcg_proxy.php?endpoint=${encodeURIComponent(endpoint)}`;
 
         try {
-            const response = await fetch(url, config);
+            const response = await fetch(proxyUrl);
             
             if (!response.ok) {
                 throw new Error(`JustTCG API error! status: ${response.status}`);
@@ -258,7 +249,8 @@ class API {
                 return result;
             });
         } catch (error) {
-            console.error('Erreur recherche JustTCG:', error);
+            console.warn('JustTCG API indisponible:', error.message);
+            // Retourner silencieusement un résultat vide plutôt qu'une erreur
             return { cards: [] };
         }
     }
@@ -273,7 +265,7 @@ class API {
                 return result;
             });
         } catch (error) {
-            console.error('Erreur détails carte JustTCG:', error);
+            console.warn('JustTCG détails indisponibles:', error.message);
             return null;
         }
     }
@@ -288,7 +280,7 @@ class API {
                 return result;
             });
         } catch (error) {
-            console.error('Erreur prix carte JustTCG:', error);
+            console.warn('JustTCG prix indisponibles:', error.message);
             return { prices: [] };
         }
     }
