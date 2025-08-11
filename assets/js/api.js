@@ -2,6 +2,8 @@ class API {
     constructor() {
         this.baseUrl = './api';
         this.gatcgApiUrl = 'https://api.gatcg.com';
+        this.justTCGApiUrl = 'https://api.justtcg.com';
+        this.justTCGApiKey = 'tcg_170ff302dbe74270a31655b1256fe621';
         this.cache = new Map();
         this.cacheTimeout = 5 * 60 * 1000; // 5 minutes
     }
@@ -215,6 +217,121 @@ class API {
     // Obtenir le nombre total de cartes
     async getCardsCount() {
         return this.request('/cards.php?action=cards_count');
+    }
+
+    // === JUSTTCG API METHODS ===
+
+    // Effectuer une requête vers l'API JustTCG
+    async justTCGRequest(endpoint, options = {}) {
+        const url = `${this.justTCGApiUrl}${endpoint}`;
+        const defaultOptions = {
+            headers: {
+                'Authorization': `Bearer ${this.justTCGApiKey}`,
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+        };
+
+        const config = { ...defaultOptions, ...options };
+
+        try {
+            const response = await fetch(url, config);
+            
+            if (!response.ok) {
+                throw new Error(`JustTCG API error! status: ${response.status}`);
+            }
+
+            return await response.json();
+        } catch (error) {
+            console.error('JustTCG API Request Error:', error);
+            throw error;
+        }
+    }
+
+    // Rechercher une carte spécifique par nom dans JustTCG
+    async searchJustTCGCardByName(cardName, gameKey = 'grand-archive') {
+        try {
+            const cacheKey = `justtcg-search-${gameKey}-${cardName}`;
+            return await this.cachedRequest(cacheKey, async () => {
+                const endpoint = `/cards/search?game=${gameKey}&name=${encodeURIComponent(cardName)}&limit=10`;
+                const result = await this.justTCGRequest(endpoint);
+                return result;
+            });
+        } catch (error) {
+            console.error('Erreur recherche JustTCG:', error);
+            return { cards: [] };
+        }
+    }
+
+    // Récupérer les détails complets d'une carte depuis JustTCG
+    async getJustTCGCardDetails(cardId) {
+        try {
+            const cacheKey = `justtcg-card-${cardId}`;
+            return await this.cachedRequest(cacheKey, async () => {
+                const endpoint = `/cards/${cardId}`;
+                const result = await this.justTCGRequest(endpoint);
+                return result;
+            });
+        } catch (error) {
+            console.error('Erreur détails carte JustTCG:', error);
+            return null;
+        }
+    }
+
+    // Récupérer les prix d'une carte depuis JustTCG
+    async getJustTCGCardPrices(cardId) {
+        try {
+            const cacheKey = `justtcg-prices-${cardId}`;
+            return await this.cachedRequest(cacheKey, async () => {
+                const endpoint = `/cards/${cardId}/prices`;
+                const result = await this.justTCGRequest(endpoint);
+                return result;
+            });
+        } catch (error) {
+            console.error('Erreur prix carte JustTCG:', error);
+            return { prices: [] };
+        }
+    }
+
+    // Enrichir les données d'une carte locale avec les informations JustTCG
+    async enrichCardWithJustTCG(localCard) {
+        if (!localCard || !localCard.name) {
+            return localCard;
+        }
+
+        try {
+            // Rechercher la carte par nom
+            const searchResult = await this.searchJustTCGCardByName(localCard.name);
+            
+            if (!searchResult.cards || searchResult.cards.length === 0) {
+                console.log(`Carte non trouvée sur JustTCG: ${localCard.name}`);
+                return { ...localCard, justTCGData: null };
+            }
+
+            // Prendre la première carte correspondante
+            const justTCGCard = searchResult.cards[0];
+            
+            // Récupérer les détails complets et les prix
+            const [cardDetails, cardPrices] = await Promise.all([
+                this.getJustTCGCardDetails(justTCGCard.id),
+                this.getJustTCGCardPrices(justTCGCard.id)
+            ]);
+
+            return {
+                ...localCard,
+                justTCGData: {
+                    id: justTCGCard.id,
+                    details: cardDetails,
+                    prices: cardPrices.prices || [],
+                    marketUrl: `https://justtcg.com/cards/${justTCGCard.id}`,
+                    lastUpdated: new Date().toISOString()
+                }
+            };
+
+        } catch (error) {
+            console.error('Erreur enrichissement JustTCG:', error);
+            return { ...localCard, justTCGData: null };
+        }
     }
 
     // Utilitaires pour gérer les images

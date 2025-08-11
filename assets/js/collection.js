@@ -539,7 +539,7 @@ class CollectionManager {
             // pour préserver l'image CSR correcte
             if (cardData) {
                 this.currentCardData = cardData;
-                this.populateModal(cardData);
+                await this.populateModal(cardData);
                 this.showModal();
             } else {
                 const response = await this.api.getCard(cardUuid);
@@ -547,7 +547,7 @@ class CollectionManager {
                 
                 if (response && response.success) {
                     this.currentCardData = response.data;
-                    this.populateModal(response.data);
+                    await this.populateModal(response.data);
                     this.showModal();
                 } else {
                     const errorMsg = response?.error || 'Réponse invalide de l\'API';
@@ -560,7 +560,7 @@ class CollectionManager {
         }
     }
 
-    populateModal(card) {
+    async populateModal(card) {
         console.log('Données de la carte pour la modal:', card); // Debug
         
         const modal = document.getElementById('card-modal');
@@ -606,6 +606,9 @@ class CollectionManager {
         // Quantité dans la collection
         document.getElementById('card-quantity').textContent = card.owned_quantity || 0;
         document.getElementById('card-foil').checked = Boolean(parseInt(card.owned_foil));
+
+        // Charger les données JustTCG en arrière-plan
+        this.loadJustTCGData(card);
     }
 
     showModal() {
@@ -617,6 +620,175 @@ class CollectionManager {
         document.getElementById('card-modal').style.display = 'none';
         document.body.style.overflow = 'auto';
         this.currentCardData = null;
+        
+        // Réinitialiser la section JustTCG
+        this.resetJustTCGSection();
+    }
+
+    // === GESTION JUSTTCG ===
+
+    async loadJustTCGData(card) {
+        if (!card || !card.name) {
+            return;
+        }
+
+        // Afficher la section et le loader
+        const section = document.getElementById('justtcg-section');
+        const loading = document.getElementById('justtcg-loading');
+        const data = document.getElementById('justtcg-data');
+        const error = document.getElementById('justtcg-error');
+
+        section.style.display = 'block';
+        loading.style.display = 'block';
+        data.style.display = 'none';
+        error.style.display = 'none';
+
+        try {
+            console.log('Chargement des données JustTCG pour:', card.name);
+            
+            // Enrichir la carte avec les données JustTCG
+            const enrichedCard = await this.api.enrichCardWithJustTCG(card);
+            
+            if (enrichedCard.justTCGData && enrichedCard.justTCGData.details) {
+                // Afficher les données
+                this.displayJustTCGData(enrichedCard.justTCGData);
+                loading.style.display = 'none';
+                data.style.display = 'block';
+            } else {
+                // Aucune donnée trouvée
+                console.log('Aucune donnée JustTCG trouvée pour:', card.name);
+                loading.style.display = 'none';
+                error.style.display = 'block';
+            }
+        } catch (err) {
+            console.error('Erreur lors du chargement JustTCG:', err);
+            loading.style.display = 'none';
+            error.style.display = 'block';
+        }
+    }
+
+    displayJustTCGData(justTCGData) {
+        const pricesContainer = document.getElementById('justtcg-prices');
+        const marketLink = document.getElementById('justtcg-market-link');
+
+        // Vider le container des prix
+        pricesContainer.innerHTML = '';
+
+        // Afficher les prix
+        if (justTCGData.prices && justTCGData.prices.length > 0) {
+            const pricesHTML = this.generatePricesHTML(justTCGData.prices);
+            pricesContainer.innerHTML = pricesHTML;
+        } else {
+            pricesContainer.innerHTML = '<p class="no-prices">Aucun prix disponible actuellement</p>';
+        }
+
+        // Mettre à jour le lien vers le marché
+        if (justTCGData.marketUrl) {
+            marketLink.href = justTCGData.marketUrl;
+            marketLink.style.display = 'inline-block';
+        } else {
+            marketLink.style.display = 'none';
+        }
+    }
+
+    generatePricesHTML(prices) {
+        if (!Array.isArray(prices) || prices.length === 0) {
+            return '<p class="no-prices">Aucun prix disponible</p>';
+        }
+
+        // Grouper les prix par condition et par foil/non-foil
+        const priceGroups = this.groupPricesByCondition(prices);
+        
+        let html = '<div class="price-table">';
+        
+        // En-tête
+        html += `
+            <div class="price-header">
+                <span>Condition</span>
+                <span>Normal</span>
+                <span>Foil</span>
+                <span>Dernière MAJ</span>
+            </div>
+        `;
+
+        // Lignes de prix
+        for (const [condition, data] of Object.entries(priceGroups)) {
+            const normalPrice = data.normal ? `€${data.normal.toFixed(2)}` : '-';
+            const foilPrice = data.foil ? `€${data.foil.toFixed(2)}` : '-';
+            const lastUpdate = data.lastUpdate ? new Date(data.lastUpdate).toLocaleDateString('fr-FR') : '-';
+            
+            html += `
+                <div class="price-row">
+                    <span class="condition">${this.translateCondition(condition)}</span>
+                    <span class="normal-price">${normalPrice}</span>
+                    <span class="foil-price">${foilPrice}</span>
+                    <span class="last-update">${lastUpdate}</span>
+                </div>
+            `;
+        }
+
+        html += '</div>';
+        return html;
+    }
+
+    groupPricesByCondition(prices) {
+        const groups = {};
+
+        prices.forEach(price => {
+            const condition = price.condition || 'unknown';
+            const isFoil = price.foil || price.is_foil || false;
+            const priceValue = parseFloat(price.price || price.value || 0);
+            
+            if (!groups[condition]) {
+                groups[condition] = {
+                    normal: null,
+                    foil: null,
+                    lastUpdate: null
+                };
+            }
+
+            if (isFoil) {
+                groups[condition].foil = priceValue;
+            } else {
+                groups[condition].normal = priceValue;
+            }
+
+            // Mettre à jour la date si elle est plus récente
+            const updateDate = price.updated_at || price.last_updated || price.date;
+            if (updateDate && (!groups[condition].lastUpdate || new Date(updateDate) > new Date(groups[condition].lastUpdate))) {
+                groups[condition].lastUpdate = updateDate;
+            }
+        });
+
+        return groups;
+    }
+
+    translateCondition(condition) {
+        const translations = {
+            'mint': 'Parfait',
+            'near_mint': 'Proche du parfait',
+            'lightly_played': 'Légèrement joué',
+            'moderately_played': 'Modérément joué',
+            'heavily_played': 'Très joué',
+            'damaged': 'Abîmé',
+            'unknown': 'Non spécifié'
+        };
+
+        return translations[condition.toLowerCase()] || condition;
+    }
+
+    resetJustTCGSection() {
+        const section = document.getElementById('justtcg-section');
+        const loading = document.getElementById('justtcg-loading');
+        const data = document.getElementById('justtcg-data');
+        const error = document.getElementById('justtcg-error');
+        const pricesContainer = document.getElementById('justtcg-prices');
+
+        section.style.display = 'none';
+        loading.style.display = 'block';
+        data.style.display = 'none';
+        error.style.display = 'none';
+        pricesContainer.innerHTML = '';
     }
 
     /**

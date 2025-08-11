@@ -360,6 +360,25 @@ $currentUser = getCurrentUser();
                         <h3>Effet</h3>
                         <div id="modal-card-effect"></div>
                     </div>
+                    <div class="justtcg-section" id="justtcg-section" style="display: none;">
+                        <h3>Informations marché (JustTCG)</h3>
+                        <div class="justtcg-loading" id="justtcg-loading">
+                            <i class="fas fa-spinner fa-spin"></i> Chargement des données de marché...
+                        </div>
+                        <div class="justtcg-data" id="justtcg-data" style="display: none;">
+                            <div class="justtcg-prices" id="justtcg-prices">
+                                <!-- Les prix seront ajoutés ici dynamiquement -->
+                            </div>
+                            <div class="justtcg-links">
+                                <a id="justtcg-market-link" href="#" target="_blank" class="btn-secondary">
+                                    <i class="fas fa-external-link-alt"></i> Voir sur JustTCG
+                                </a>
+                            </div>
+                        </div>
+                        <div class="justtcg-error" id="justtcg-error" style="display: none;">
+                            <p><i class="fas fa-exclamation-triangle"></i> Impossible de récupérer les données de marché</p>
+                        </div>
+                    </div>
                     <div class="collection-actions ">
                         <h3>Dans ma collection</h3>
                         <div class="quantity-controls">
