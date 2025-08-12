@@ -343,54 +343,112 @@ $currentUser = getCurrentUser();
     <div id="card-modal" class="modal">
         <div class="modal-content ">
             <span class="close-modal">&times;</span>
-            <div class="modal-body">
-                <div class="card-image">
-                    <img id="modal-card-image" src="" alt="">
+            
+            <!-- Nouvelle disposition optimisée : 3 zones principales -->
+            <div class="modal-body-optimized">
+                <!-- Zone 1: Image de la carte -->
+                <div class="modal-image-section">
+                    <div class="card-image-wrapper">
+                        <img id="modal-card-image" src="" alt="" class="card-image-large">
+                    </div>
                 </div>
-                <div class="card-details">
-                    <h2 id="modal-card-name" class="text-gradient"></h2>
-                    <div class="card-info ">
-                        <p><strong>Extension:</strong> <span id="modal-card-set"></span></p>
-                        <p><strong>Numéro:</strong> <span id="modal-card-number"></span></p>
-                        <p><strong>Rareté:</strong> <span id="modal-card-rarity"></span></p>
-                        <p><strong>Classe:</strong> <span id="modal-card-class"></span></p>
-                        <p><strong>Type:</strong> <span id="modal-card-type"></span></p>
+                
+                <!-- Zone 2: Contenu principal (Titre + Détails + Effet) -->
+                <div class="modal-content-section">
+                    <div class="card-header">
+                        <h1 id="modal-card-name" class="card-title-large text-gradient"></h1>
                     </div>
-                    <div class="card-effect ">
-                        <h3>Effet</h3>
-                        <div id="modal-card-effect"></div>
-                    </div>
-                    <div class="justtcg-section" id="justtcg-section" style="display: none;">
-                        <h3>Informations marché (JustTCG)</h3>
-                        <div class="justtcg-loading" id="justtcg-loading">
-                            <i class="fas fa-spinner fa-spin"></i> Chargement des données de marché...
+                    
+                    <div class="card-info-grid">
+                        <div class="info-item">
+                            <span class="info-label">Extension</span>
+                            <span class="info-value" id="modal-card-set"></span>
                         </div>
-                        <div class="justtcg-data" id="justtcg-data" style="display: none;">
-                            <div class="justtcg-prices" id="justtcg-prices">
-                                <!-- Les prix seront ajoutés ici dynamiquement -->
+                        <div class="info-item">
+                            <span class="info-label">Numéro</span>
+                            <span class="info-value" id="modal-card-number"></span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Rareté</span>
+                            <span class="info-value" id="modal-card-rarity"></span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Classe</span>
+                            <span class="info-value" id="modal-card-class"></span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Type</span>
+                            <span class="info-value" id="modal-card-type"></span>
+                        </div>
+                    </div>
+                    
+                    <div class="card-effect-section">
+                        <h3 class="section-title">
+                            <i class="fas fa-magic"></i> Effet de la carte
+                        </h3>
+                        <div id="modal-card-effect" class="effect-content"></div>
+                    </div>
+                </div>
+                
+                <!-- Zone 3: Actions collection (sidebar) -->
+                <div class="modal-actions-section">
+                    <div class="collection-panel">
+                        <h3 class="panel-title">
+                            <i class="fas fa-folder-plus"></i> Ma Collection
+                        </h3>
+                        <div class="quantity-section">
+                            <label class="quantity-label">Quantité possédée</label>
+                            <div class="quantity-controls-modern">
+                                <button class="quantity-btn-modern" data-action="decrease">
+                                    <i class="fas fa-minus"></i>
+                                </button>
+                                <span class="quantity-display" id="card-quantity">0</span>
+                                <button class="quantity-btn-modern" data-action="increase">
+                                    <i class="fas fa-plus"></i>
+                                </button>
                             </div>
-                            <div class="justtcg-links">
-                                <a id="justtcg-market-link" href="#" target="_blank" class="btn-secondary">
-                                    <i class="fas fa-external-link-alt"></i> Voir sur JustTCG
-                                </a>
-                            </div>
                         </div>
-                        <div class="justtcg-error" id="justtcg-error" style="display: none;">
-                            <p><i class="fas fa-exclamation-triangle"></i> Impossible de récupérer les données de marché</p>
-                        </div>
-                    </div>
-                    <div class="collection-actions ">
-                        <h3>Dans ma collection</h3>
-                        <div class="quantity-controls">
-                            <button class="quantity-btn " data-action="decrease">-</button>
-                            <span class="quantity" id="card-quantity">0</span>
-                            <button class="quantity-btn " data-action="increase">+</button>
-                        </div>
-                        <div class="foil-controls">
-                            <label>
-                                <input type="checkbox" id="card-foil"> Version foil
+                        
+                        <div class="foil-section">
+                            <label class="foil-toggle">
+                                <input type="checkbox" id="card-foil">
+                                <span class="foil-slider"></span>
+                                <span class="foil-label">
+                                    <i class="fas fa-star"></i> Version Foil
+                                </span>
                             </label>
                         </div>
+                        
+                        <div class="collection-stats">
+                            <div class="stat-row">
+                                <i class="fas fa-layer-group"></i>
+                                <span>Total possédé: <strong id="card-quantity-display">0</strong></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Deuxième ligne : Prix JustTCG pleine largeur -->
+            <div class="justtcg-section-full" id="justtcg-section" style="display: none;">
+                <div class="justtcg-container">
+                    <h3><i class="fas fa-chart-line"></i> Prix du marché</h3>
+                    <div class="justtcg-loading" id="justtcg-loading">
+                        <i class="fas fa-spinner fa-spin"></i> 
+                        <span>Chargement des données de marché...</span>
+                    </div>
+                    <div class="justtcg-data" id="justtcg-data" style="display: none;">
+                        <div class="justtcg-prices" id="justtcg-prices">
+                            <!-- Les prix seront ajoutés ici dynamiquement -->
+                        </div>
+                        <div class="justtcg-links">
+                            <a id="justtcg-market-link" href="#" target="_blank" class="btn-justtcg">
+                                <i class="fas fa-external-link-alt"></i> Voir sur JustTCG
+                            </a>
+                        </div>
+                    </div>
+                    <div class="justtcg-error" id="justtcg-error" style="display: none;">
+                        <p><i class="fas fa-exclamation-triangle"></i> Impossible de récupérer les données de marché</p>
                     </div>
                 </div>
             </div>

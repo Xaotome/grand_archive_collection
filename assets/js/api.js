@@ -246,11 +246,11 @@ class API {
     }
 
     // Rechercher une carte spécifique par nom dans JustTCG
-    async searchJustTCGCardByName(cardName, gameKey = 'grand-archive') {
+    async searchJustTCGCardByName(cardName, gameKey = 'grand-archive-tcg') {
         try {
             const cacheKey = `justtcg-search-${gameKey}-${cardName}`;
             return await this.cachedRequest(cacheKey, async () => {
-                const endpoint = `/cards/search?game=${gameKey}&name=${encodeURIComponent(cardName)}&limit=10`;
+                const endpoint = `/cards?game=${gameKey}&q=${encodeURIComponent(cardName)}`;
                 const result = await this.justTCGRequest(endpoint);
                 return result;
             });
@@ -283,6 +283,7 @@ class API {
             return await this.cachedRequest(cacheKey, async () => {
                 const endpoint = `/cards/${cardId}/prices`;
                 const result = await this.justTCGRequest(endpoint);
+        
                 return result;
             });
         } catch (error) {
@@ -301,27 +302,57 @@ class API {
             // Rechercher la carte par nom
             const searchResult = await this.searchJustTCGCardByName(localCard.name);
             
-            if (!searchResult.cards || searchResult.cards.length === 0) {
-                console.log(`Carte non trouvée sur JustTCG: ${localCard.name}`);
+            if (!searchResult.data || searchResult.data.length === 0) {
                 return { ...localCard, justTCGData: null };
             }
 
             // Prendre la première carte correspondante
-            const justTCGCard = searchResult.cards[0];
+            const justTCGCard = searchResult.data[0];
             
-            // Récupérer les détails complets et les prix
-            const [cardDetails, cardPrices] = await Promise.all([
-                this.getJustTCGCardDetails(justTCGCard.id),
-                this.getJustTCGCardPrices(justTCGCard.id)
-            ]);
+            // Extraire les informations de prix des variants
+            const priceData = {
+                currentPrice: null,
+                avgPrice: null,
+                priceHistory: [],
+                variants: []
+            };
+
+            if (justTCGCard.variants && justTCGCard.variants.length > 0) {
+                // Pour chaque variant (condition de carte)
+                justTCGCard.variants.forEach(variant => {
+                    priceData.variants.push({
+                        condition: variant.condition,
+                        price: variant.price,
+                        avgPrice: variant.avgPrice,
+                        avgPrice30d: variant.avgPrice30d,
+                        priceChange7d: variant.priceChange7d,
+                        priceChange30d: variant.priceChange30d,
+                        minPrice30d: variant.minPrice30d,
+                        maxPrice30d: variant.maxPrice30d,
+                        priceHistory: variant.priceHistory || [],
+                        lastUpdated: variant.lastUpdated
+                    });
+                });
+
+                // Prendre le premier variant (généralement Near Mint) comme prix principal
+                const mainVariant = justTCGCard.variants[0];
+                priceData.currentPrice = mainVariant.price;
+                priceData.avgPrice = mainVariant.avgPrice;
+                priceData.priceHistory = mainVariant.priceHistory || [];
+            }
 
             return {
                 ...localCard,
                 justTCGData: {
                     id: justTCGCard.id,
-                    details: cardDetails,
-                    prices: cardPrices.prices || [],
-                    marketUrl: `https://justtcg.com/cards/${justTCGCard.id}`,
+                    name: justTCGCard.name,
+                    set: justTCGCard.set,
+                    number: justTCGCard.number,
+                    rarity: justTCGCard.rarity,
+                    game: justTCGCard.game,
+                    tcgplayerId: justTCGCard.tcgplayerId,
+                    pricing: priceData,
+                    marketUrl: this.buildCorrectJustTCGUrl(justTCGCard, localCard),
                     lastUpdated: new Date().toISOString()
                 }
             };
@@ -330,6 +361,53 @@ class API {
             console.error('Erreur enrichissement JustTCG:', error);
             return { ...localCard, justTCGData: null };
         }
+    }
+
+    // Construire l'URL JustTCG correcte avec tests et fallback
+    buildCorrectJustTCGUrl(justTCGCard, localCard) {
+        try {
+            const exploreUrl = this.buildExploreJustTCGUrl(justTCGCard, localCard);
+            return exploreUrl;
+            
+        } catch (error) {
+            console.error('Erreur construction URL JustTCG:', error);
+            return `https://justtcg.com/cards/${justTCGCard.id}`;
+        }
+    }
+
+    // Construire l'URL explore.justtcg.com avec le format complexe
+    buildExploreJustTCGUrl(justTCGCard, localCard) {
+        const baseUrl = 'https://explore.justtcg.com/Grand%20Archive%20TCG';
+        
+        // Utiliser le nom du set depuis JustTCG
+        let setName = justTCGCard.set || 'unknown-set';
+        
+        // Utiliser le nom local si disponible pour éviter les transformations de l'API
+        let cardName = justTCGCard.id;
+        
+        // Construire le slug de la carte
+        let cardSlug = cardName;
+        
+        return `${baseUrl}/${encodeURIComponent(setName)}/${cardSlug}`;
+    }
+
+    // Mapper les raretés vers les suffixes utilisés par JustTCG
+    mapRarityToSlug(rarity) {
+        const rarityMap = {
+            'CSR': 'collector-super-rare',
+            'CR': 'collector-rare', 
+            'SR': 'super-rare',
+            'R': 'rare',
+            'U': 'uncommon',
+            'C': 'common',
+            'Ultra Rare': 'ultra-rare',
+            'Super Rare': 'super-rare',
+            'Rare': 'rare',
+            'Uncommon': 'uncommon',
+            'Common': 'common'
+        };
+        
+        return rarityMap[rarity] || rarity?.toLowerCase().replace(/\s+/g, '-') || 'unknown';
     }
 
     // Utilitaires pour gérer les images

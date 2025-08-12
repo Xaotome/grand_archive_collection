@@ -92,13 +92,22 @@ class CollectionManager {
             }
         });
 
-        // Contrôles de quantité
-        const quantityControls = modal.querySelectorAll('.quantity-btn');
-        quantityControls.forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const action = e.target.dataset.action;
+        // Créer le handler pour les boutons de quantité
+        this.quantityClickHandler = (e) => {
+            e.preventDefault();
+            // Utiliser currentTarget pour toujours pointer vers le bouton, même si on clique sur l'icône
+            const action = e.currentTarget.dataset.action;
+            if (action) {
                 this.updateCardQuantity(action);
-            });
+            } else {
+                console.warn('Action manquante sur le bouton de quantité:', e.currentTarget);
+            }
+        };
+        
+        // Contrôles de quantité (nouveaux sélecteurs)
+        const quantityControls = modal.querySelectorAll('.quantity-btn-modern');
+        quantityControls.forEach(btn => {
+            btn.addEventListener('click', this.quantityClickHandler);
         });
 
         // Contrôle foil
@@ -433,15 +442,22 @@ class CollectionManager {
 
         // Déterminer le contexte (collection ou recherche)
         const isSearchView = containerId === 'search-results';
-        container.innerHTML = cards.map(card => this.createCardHTML(card, isSearchView)).join('');
+        
+        // Pour la vue collection, séparer les versions foil/normale
+        let cardsToDisplay = cards;
+        if (!isSearchView) {
+            cardsToDisplay = this.separateCardVersions(cards);
+        }
+        
+        container.innerHTML = cardsToDisplay.map(card => this.createCardHTML(card, isSearchView)).join('');
         
         // Ajouter les événements aux cartes
         container.querySelectorAll('.card-item').forEach((cardEl, index) => {
             cardEl.addEventListener('click', () => {
                 const cardUuid = cardEl.dataset.cardUuid;
                 const editionUuid = cardEl.dataset.editionUuid;
-                // Passer les données complètes de la carte pour préserver l'image CSR
-                const cardData = cards[index];
+                // Utiliser les données de la carte affichée (qui peut être une version séparée)
+                const cardData = cardsToDisplay[index];
                 this.openCardModal(cardUuid, editionUuid, cardData);
             });
 
@@ -455,6 +471,33 @@ class CollectionManager {
                     cardEl.style.transform = '';
                 }, 150);
             }, { passive: true });
+        });
+    }
+
+    // Traiter les cartes pour ajouter les métadonnées de version
+    separateCardVersions(cards) {
+        return cards.map(card => {
+            // Les cartes arrivent déjà séparées de la base de données
+            // Il suffit d'ajouter les métadonnées pour l'affichage
+            const isFoil = Boolean(parseInt(card.owned_foil));
+            const isCsr = Boolean(parseInt(card.owned_csr));
+            
+            let version_type = 'normal';
+            let display_suffix = '';
+            
+            if (isCsr) {
+                version_type = 'csr';
+                display_suffix = ' (CSR)';
+            } else if (isFoil) {
+                version_type = 'foil';
+                display_suffix = ' (Foil)';
+            }
+            
+            return {
+                ...card,
+                version_type: version_type,
+                display_suffix: display_suffix
+            };
         });
     }
 
@@ -495,14 +538,14 @@ class CollectionManager {
         }
 
         return `
-            <div class="card-item ${cardTypeClass}" data-card-uuid="${card.uuid || ''}" data-edition-uuid="${card.edition_uuid || ''}" data-foil="${isFoil ? 'true' : 'false'}" data-csr="${isCsr ? 'true' : 'false'}">
+            <div class="card-item ${cardTypeClass}" data-card-uuid="${card.uuid || ''}" data-edition-uuid="${card.edition_uuid || ''}" data-foil="${isFoil ? 'true' : 'false'}" data-csr="${isCsr ? 'true' : 'false'}" data-version-type="${card.version_type || 'normal'}">
                 <div class="card-image">
                     <img src="${imageUrl}" alt="${card.name}" loading="lazy">
                     ${quantityBadge}
                     ${typeIndicator}
                 </div>
                 <div class="card-info">
-                    <div class="card-name">${card.name}</div>
+                    <div class="card-name">${card.name}${card.display_suffix || ''}</div>
                     <span class="card-set">${card.set_name} (${card.set_prefix})</span>
                     <span class="card-rarity ${rarityClass}">${this.getRarityName(card.rarity)}</span>
                     ${card.element ? `<span class="card-element">${card.element}</span>` : ''}
@@ -539,16 +582,20 @@ class CollectionManager {
             // pour préserver l'image CSR correcte
             if (cardData) {
                 this.currentCardData = cardData;
-                await this.populateModal(cardData);
+                this.populateModal(cardData);
                 this.showModal();
+                // Charger JustTCG en arrière-plan avec un petit délai pour éviter tout blocage
+                setTimeout(() => this.loadJustTCGData(cardData), 100);
             } else {
                 const response = await this.api.getCard(cardUuid);
                 console.log('Réponse API getCard:', response);
                 
                 if (response && response.success) {
                     this.currentCardData = response.data;
-                    await this.populateModal(response.data);
+                    this.populateModal(response.data);
                     this.showModal();
+                    // Charger JustTCG en arrière-plan avec un petit délai pour éviter tout blocage
+                    setTimeout(() => this.loadJustTCGData(response.data), 100);
                 } else {
                     const errorMsg = response?.error || 'Réponse invalide de l\'API';
                     throw new Error(errorMsg);
@@ -560,7 +607,7 @@ class CollectionManager {
         }
     }
 
-    async populateModal(card) {
+    populateModal(card) {
         console.log('Données de la carte pour la modal:', card); // Debug
         
         const modal = document.getElementById('card-modal');
@@ -604,16 +651,41 @@ class CollectionManager {
         }
 
         // Quantité dans la collection
-        document.getElementById('card-quantity').textContent = card.owned_quantity || 0;
+        this.updateQuantityDisplay(card.owned_quantity || 0);
         document.getElementById('card-foil').checked = Boolean(parseInt(card.owned_foil));
 
-        // Charger les données JustTCG en arrière-plan
-        this.loadJustTCGData(card);
+        // Réinitialiser la section JustTCG pour éviter l'affichage de données obsolètes
+        this.resetJustTCGSection();
     }
 
     showModal() {
         document.getElementById('card-modal').style.display = 'block';
         document.body.style.overflow = 'hidden';
+        
+        // Réattacher les event listeners pour s'assurer qu'ils fonctionnent
+        this.ensureModalEventListeners();
+    }
+    
+    ensureModalEventListeners() {
+        // Vérifier et réattacher les event listeners des boutons de quantité si nécessaire
+        const modal = document.getElementById('card-modal');
+        const quantityControls = modal.querySelectorAll('.quantity-btn-modern');
+        
+        quantityControls.forEach(btn => {
+            // Supprimer les anciens listeners pour éviter les doublons
+            btn.removeEventListener('click', this.quantityClickHandler);
+            // Ajouter le nouveau listener
+            btn.addEventListener('click', this.quantityClickHandler);
+        });
+        
+        // Vérifier le checkbox foil aussi
+        const foilCheckbox = document.getElementById('card-foil');
+        if (foilCheckbox && !foilCheckbox.hasAttribute('data-listener-attached')) {
+            foilCheckbox.addEventListener('change', (e) => {
+                this.toggleFoilStatus(e.target.checked);
+            });
+            foilCheckbox.setAttribute('data-listener-attached', 'true');
+        }
     }
 
     closeModal() {
@@ -623,6 +695,19 @@ class CollectionManager {
         
         // Réinitialiser la section JustTCG
         this.resetJustTCGSection();
+    }
+
+    // Helper pour mettre à jour l'affichage de la quantité dans les deux endroits
+    updateQuantityDisplay(quantity) {
+        const quantityEl = document.getElementById('card-quantity');
+        const quantityDisplayEl = document.getElementById('card-quantity-display');
+        
+        if (quantityEl) {
+            quantityEl.textContent = quantity;
+        }
+        if (quantityDisplayEl) {
+            quantityDisplayEl.textContent = quantity;
+        }
     }
 
     // === GESTION JUSTTCG ===
@@ -649,7 +734,7 @@ class CollectionManager {
             // Enrichir la carte avec les données JustTCG
             const enrichedCard = await this.api.enrichCardWithJustTCG(card);
             
-            if (enrichedCard.justTCGData && enrichedCard.justTCGData.details) {
+            if (enrichedCard.justTCGData) {
                 // Afficher les données
                 this.displayJustTCGData(enrichedCard.justTCGData);
                 loading.style.display = 'none';
@@ -674,16 +759,28 @@ class CollectionManager {
         // Vider le container des prix
         pricesContainer.innerHTML = '';
 
-        // Afficher les prix
-        if (justTCGData.prices && justTCGData.prices.length > 0) {
-            const pricesHTML = this.generatePricesHTML(justTCGData.prices);
+        console.log('JustTCG Data:', justTCGData);
+
+        // Afficher les prix selon la nouvelle structure
+        if (justTCGData.pricing && justTCGData.pricing.variants && justTCGData.pricing.variants.length > 0) {
+            const pricesHTML = this.generatePricesHTML(justTCGData.pricing.variants);
             pricesContainer.innerHTML = pricesHTML;
+        } else if (justTCGData.pricing && justTCGData.pricing.currentPrice) {
+            // Afficher au moins le prix principal s'il n'y a pas de variants détaillés
+            pricesContainer.innerHTML = `
+                <div class="main-price">
+                    <span class="price-label">Prix actuel:</span>
+                    <span class="price-value">€${justTCGData.pricing.currentPrice.toFixed(2)}</span>
+                    ${justTCGData.pricing.avgPrice ? `<span class="avg-price">(Moy: €${justTCGData.pricing.avgPrice.toFixed(2)})</span>` : ''}
+                </div>
+            `;
         } else {
             pricesContainer.innerHTML = '<p class="no-prices">Aucun prix disponible actuellement</p>';
         }
 
         // Mettre à jour le lien vers le marché
         if (justTCGData.marketUrl) {
+            console.log(justTCGData.marketUrl);
             marketLink.href = justTCGData.marketUrl;
             marketLink.style.display = 'inline-block';
         } else {
@@ -691,43 +788,61 @@ class CollectionManager {
         }
     }
 
-    generatePricesHTML(prices) {
-        if (!Array.isArray(prices) || prices.length === 0) {
+    generatePricesHTML(variants) {
+        if (!Array.isArray(variants) || variants.length === 0) {
             return '<p class="no-prices">Aucun prix disponible</p>';
         }
 
-        // Grouper les prix par condition et par foil/non-foil
-        const priceGroups = this.groupPricesByCondition(prices);
-        
         let html = '<div class="price-table">';
         
-        // En-tête
+        // En-tête simplifié (JustTCG n'a qu'une colonne de prix par condition)
         html += `
             <div class="price-header">
                 <span>Condition</span>
-                <span>Normal</span>
-                <span>Foil</span>
+                <span>Prix actuel</span>
+                <span>Prix moyen</span>
+                <span>Évolution 7j</span>
                 <span>Dernière MAJ</span>
             </div>
         `;
 
-        // Lignes de prix
-        for (const [condition, data] of Object.entries(priceGroups)) {
-            const normalPrice = data.normal ? `€${data.normal.toFixed(2)}` : '-';
-            const foilPrice = data.foil ? `€${data.foil.toFixed(2)}` : '-';
-            const lastUpdate = data.lastUpdate ? new Date(data.lastUpdate).toLocaleDateString('fr-FR') : '-';
+        // Lignes de prix pour chaque variant (condition)
+        variants.forEach(variant => {
+            const condition = this.translateCondition(variant.condition);
+            const currentPrice = variant.price ? `€${variant.price.toFixed(2)}` : '-';
+            const avgPrice = variant.avgPrice ? `€${variant.avgPrice.toFixed(2)}` : '-';
+            
+            // Évolution sur 7 jours (en pourcentage)
+            let priceChange = '-';
+            if (variant.priceChange7d !== undefined && variant.priceChange7d !== null) {
+                const change = variant.priceChange7d;
+                const changeClass = change > 0 ? 'price-up' : change < 0 ? 'price-down' : 'price-stable';
+                const changeSign = change > 0 ? '+' : '';
+                priceChange = `<span class="${changeClass}">${changeSign}${change.toFixed(1)}%</span>`;
+            }
+            
+            // Date de mise à jour
+            const lastUpdate = variant.lastUpdated ? 
+                new Date(variant.lastUpdated * 1000).toLocaleDateString('fr-FR') : '-';
             
             html += `
                 <div class="price-row">
-                    <span class="condition">${this.translateCondition(condition)}</span>
-                    <span class="normal-price">${normalPrice}</span>
-                    <span class="foil-price">${foilPrice}</span>
+                    <span class="condition">${condition}</span>
+                    <span class="current-price">${currentPrice}</span>
+                    <span class="avg-price">${avgPrice}</span>
+                    <span class="price-change">${priceChange}</span>
                     <span class="last-update">${lastUpdate}</span>
                 </div>
             `;
-        }
+        });
 
         html += '</div>';
+        
+        // Ajouter un graphique de prix si disponible
+        if (variants[0] && variants[0].priceHistory && variants[0].priceHistory.length > 1) {
+            html += this.generatePriceChart(variants[0].priceHistory);
+        }
+        
         return html;
     }
 
@@ -766,15 +881,88 @@ class CollectionManager {
     translateCondition(condition) {
         const translations = {
             'mint': 'Parfait',
+            'near mint': 'Proche du parfait',
             'near_mint': 'Proche du parfait',
+            'lightly played': 'Légèrement joué',
             'lightly_played': 'Légèrement joué',
+            'moderately played': 'Modérément joué',
             'moderately_played': 'Modérément joué',
+            'heavily played': 'Très joué',
             'heavily_played': 'Très joué',
             'damaged': 'Abîmé',
             'unknown': 'Non spécifié'
         };
 
         return translations[condition.toLowerCase()] || condition;
+    }
+
+    generatePriceChart(priceHistory) {
+        if (!priceHistory || priceHistory.length < 2) {
+            return '';
+        }
+
+        // Générer un mini-graphique de prix avec SVG
+        const points = priceHistory.slice(-10); // Derniers 10 points maximum
+        const prices = points.map(p => p.p);
+        const minPrice = Math.min(...prices);
+        const maxPrice = Math.max(...prices);
+        const priceRange = maxPrice - minPrice || 1;
+
+        const width = 400;
+        const height = 100;
+        const padding = 20;
+
+        // Créer un ID unique pour éviter les conflits SVG
+        const uniqueId = Date.now();
+        
+        let pathData = '';
+        points.forEach((point, index) => {
+            const x = padding + (index / (points.length - 1)) * (width - 2 * padding);
+            const y = height - padding - ((point.p - minPrice) / priceRange) * (height - 2 * padding);
+            pathData += (index === 0 ? 'M' : 'L') + x + ',' + y;
+        });
+
+        return `
+            <div class="price-chart-container">
+                <div class="price-chart-header">
+                    <h4><i class="fas fa-chart-line"></i> Évolution des prix (10 derniers points)</h4>
+                    <div class="price-range">
+                        <span class="min-price">Min: €${minPrice.toFixed(2)}</span>
+                        <span class="max-price">Max: €${maxPrice.toFixed(2)}</span>
+                    </div>
+                </div>
+                <div class="price-chart">
+                    <svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="none">
+                        <!-- Gradient de fond -->
+                        <defs>
+                            <linearGradient id="priceGradient_${uniqueId}" x1="0%" y1="0%" x2="0%" y2="100%">
+                                <stop offset="0%" style="stop-color:#6366f1;stop-opacity:0.3"/>
+                                <stop offset="100%" style="stop-color:#6366f1;stop-opacity:0.05"/>
+                            </linearGradient>
+                            <!-- Gradient pour la ligne -->
+                            <linearGradient id="lineGradient_${uniqueId}" x1="0%" y1="0%" x2="100%" y2="0%">
+                                <stop offset="0%" style="stop-color:#8b5cf6"/>
+                                <stop offset="50%" style="stop-color:#6366f1"/>
+                                <stop offset="100%" style="stop-color:#06b6d4"/>
+                            </linearGradient>
+                        </defs>
+                        
+                        <!-- Zone sous la courbe -->
+                        <path d="${pathData}L${width - padding},${height - padding}L${padding},${height - padding}Z" fill="url(#priceGradient_${uniqueId})" opacity="0.6"/>
+                        
+                        <!-- Ligne de prix -->
+                        <path d="${pathData}" stroke="url(#lineGradient_${uniqueId})" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                        
+                        <!-- Points sur la courbe -->
+                        ${points.map((point, index) => {
+                            const x = padding + (index / (points.length - 1)) * (width - 2 * padding);
+                            const y = height - padding - ((point.p - minPrice) / priceRange) * (height - 2 * padding);
+                            return `<circle cx="${x}" cy="${y}" r="2.5" fill="#fff" stroke="#6366f1" stroke-width="2"/>`;
+                        }).join('')}
+                    </svg>
+                </div>
+            </div>
+        `;
     }
 
     resetJustTCGSection() {
@@ -1024,9 +1212,19 @@ class CollectionManager {
     }
 
     async updateCardQuantity(action) {
-        if (!this.currentCardData) return;
+        console.log('updateCardQuantity appelée avec action:', action);
+        
+        if (!this.currentCardData) {
+            console.error('currentCardData manquante dans updateCardQuantity');
+            return;
+        }
 
         const quantityEl = document.getElementById('card-quantity');
+        if (!quantityEl) {
+            console.error('Élément card-quantity introuvable');
+            return;
+        }
+        
         let currentQuantity = parseInt(quantityEl.textContent) || 0;
         let newQuantity = currentQuantity;
 
@@ -1034,6 +1232,9 @@ class CollectionManager {
             newQuantity = currentQuantity + 1;
         } else if (action === 'decrease') {
             newQuantity = Math.max(0, currentQuantity - 1);
+        } else {
+            console.error('Action inconnue:', action);
+            return;
         }
 
         try {
@@ -1050,7 +1251,7 @@ class CollectionManager {
             );
 
             if (response.success) {
-                quantityEl.textContent = newQuantity;
+                this.updateQuantityDisplay(newQuantity);
                 this.api.showNotification(
                     newQuantity > 0 ? 'Quantité mise à jour' : 'Carte retirée de la collection',
                     'success'
@@ -1071,23 +1272,11 @@ class CollectionManager {
         if (!this.currentCardData) return;
 
         try {
-            const quantity = parseInt(document.getElementById('card-quantity').textContent) || 0;
+            const quantityEl = document.getElementById('card-quantity');
+            const quantity = parseInt(quantityEl ? quantityEl.textContent : '0') || 0;
             
             if (quantity > 0) {
-                // D'abord supprimer l'ancienne entrée (foil ou non-foil)
-                const oldFoilStatus = this.currentCardData.owned_foil || false;
-                
-                if (oldFoilStatus !== isFoil) {
-                    // Supprimer l'ancienne entrée
-                    await this.api.updateQuantity(
-                        this.currentCardData.uuid,
-                        this.currentCardData.edition_uuid,
-                        oldFoilStatus,
-                        0 // Quantité 0 = suppression
-                    );
-                }
-                
-                // Créer/mettre à jour la nouvelle entrée
+                // Créer/mettre à jour la version foil/non-foil sans supprimer l'autre
                 const response = await this.api.updateQuantity(
                     this.currentCardData.uuid,
                     this.currentCardData.edition_uuid,
@@ -1096,12 +1285,12 @@ class CollectionManager {
                 );
 
                 if (response.success) {
-                    this.api.showNotification('Statut foil mis à jour', 'success');
+                    this.api.showNotification('Version ajoutée à la collection', 'success');
                     
                     // Mettre à jour les données locales
                     this.currentCardData.owned_foil = isFoil;
                     
-                    // Recharger la collection
+                    // Recharger la collection pour afficher les deux versions
                     if (this.currentView === 'collection') {
                         this.loadMyCollection();
                     }

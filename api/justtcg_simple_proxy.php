@@ -13,7 +13,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 // Configuration JustTCG
 $apiKey = 'tcg_170ff302dbe74270a31655b1256fe621';
-$baseUrl = 'https://api.justtcg.com';
+$baseUrl = 'api.justtcg.com/v1';
 
 // Récupérer l'endpoint
 $endpoint = $_GET['endpoint'] ?? '';
@@ -38,7 +38,7 @@ if (function_exists('curl_init') && !$response) {
         CURLOPT_SSL_VERIFYHOST => false,
         CURLOPT_FOLLOWLOCATION => true,
         CURLOPT_HTTPHEADER => [
-            'Authorization: Bearer ' . $apiKey,
+            'X-API-Key: ' . $apiKey,
             'User-Agent: Mozilla/5.0 (compatible; PHP-Proxy/1.0)',
             'Accept: application/json'
         ]
