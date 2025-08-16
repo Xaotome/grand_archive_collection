@@ -6,6 +6,11 @@ class CollectionManager {
         this.charts = {};
         this.api = window.api; // Référence locale à l'API
         
+        // Variables pour la navigation par flèches dans les résultats de recherche
+        this.searchResults = [];
+        this.currentCardIndex = -1;
+        this.keyboardListenerAttached = false;
+        
         this.init();
     }
 
@@ -277,6 +282,12 @@ class CollectionManager {
         document.getElementById(`${viewName}-view`).classList.add('active');
         this.currentView = viewName;
 
+        // Réinitialiser les variables de navigation si on quitte la vue recherche
+        if (viewName !== 'search') {
+            this.searchResults = [];
+            this.currentCardIndex = -1;
+        }
+
         // Charger les données spécifiques à la vue
         switch (viewName) {
             case 'collection':
@@ -413,6 +424,9 @@ class CollectionManager {
             
             if (response && response.success) {
                 console.log('Nombre de résultats:', response.data.length); // Debug
+                // Stocker les résultats pour la navigation par flèches
+                this.searchResults = response.data;
+                this.currentCardIndex = -1;
                 this.displayCards(response.data, 'search-results');
             } else {
                 console.error('Erreur de recherche:', response?.error || 'Erreur inconnue');
@@ -458,6 +472,10 @@ class CollectionManager {
                 const editionUuid = cardEl.dataset.editionUuid;
                 // Utiliser les données de la carte affichée (qui peut être une version séparée)
                 const cardData = cardsToDisplay[index];
+                // Stocker l'index de la carte cliquée pour la navigation
+                if (isSearchView) {
+                    this.currentCardIndex = index;
+                }
                 this.openCardModal(cardUuid, editionUuid, cardData);
             });
 
@@ -664,6 +682,13 @@ class CollectionManager {
         
         // Réattacher les event listeners pour s'assurer qu'ils fonctionnent
         this.ensureModalEventListeners();
+        
+        // Attacher le listener pour les flèches directionnelles si on est en vue recherche
+        if (this.currentView === 'search' && this.searchResults.length > 0) {
+            this.attachKeyboardNavigation();
+            // Afficher l'indicateur de navigation
+            this.updateNavigationIndicator();
+        }
     }
     
     ensureModalEventListeners() {
@@ -692,6 +717,16 @@ class CollectionManager {
         document.getElementById('card-modal').style.display = 'none';
         document.body.style.overflow = 'auto';
         this.currentCardData = null;
+        
+        // Détacher le listener clavier
+        this.detachKeyboardNavigation();
+        
+        // Supprimer l'indicateur de navigation s'il existe
+        const modal = document.getElementById('card-modal');
+        const indicator = modal.querySelector('.navigation-indicator');
+        if (indicator) {
+            indicator.remove();
+        }
         
         // Réinitialiser la section JustTCG
         this.resetJustTCGSection();
@@ -1894,6 +1929,125 @@ class CollectionManager {
         } finally {
             testBtn.disabled = false;
             testBtn.innerHTML = '<i class="fas fa-vial"></i> Test de synchronisation';
+        }
+    }
+
+    // === NAVIGATION PAR FLÈCHES DIRECTIONNELLES ===
+
+    attachKeyboardNavigation() {
+        if (this.keyboardListenerAttached) {
+            return;
+        }
+
+        this.keyboardHandler = (e) => {
+            // Vérifier que le modal est ouvert et qu'on a des résultats de recherche
+            if (document.getElementById('card-modal').style.display !== 'block' || 
+                this.searchResults.length === 0) {
+                return;
+            }
+
+            // Empêcher la navigation si l'utilisateur tape dans un champ de texte
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || 
+                e.target.isContentEditable) {
+                return;
+            }
+
+            switch (e.key) {
+                case 'ArrowLeft':
+                    e.preventDefault();
+                    this.navigateToPreviousCard();
+                    break;
+                case 'ArrowRight':
+                    e.preventDefault();
+                    this.navigateToNextCard();
+                    break;
+                case 'Escape':
+                    e.preventDefault();
+                    this.closeModal();
+                    break;
+            }
+        };
+
+        document.addEventListener('keydown', this.keyboardHandler);
+        this.keyboardListenerAttached = true;
+    }
+
+    detachKeyboardNavigation() {
+        if (this.keyboardHandler && this.keyboardListenerAttached) {
+            document.removeEventListener('keydown', this.keyboardHandler);
+            this.keyboardListenerAttached = false;
+            this.keyboardHandler = null;
+        }
+    }
+
+    navigateToNextCard() {
+        if (this.currentCardIndex < this.searchResults.length - 1) {
+            this.currentCardIndex++;
+            this.loadCardAtIndex(this.currentCardIndex);
+        }
+    }
+
+    navigateToPreviousCard() {
+        if (this.currentCardIndex > 0) {
+            this.currentCardIndex--;
+            this.loadCardAtIndex(this.currentCardIndex);
+        }
+    }
+
+    async loadCardAtIndex(index) {
+        if (index < 0 || index >= this.searchResults.length) {
+            return;
+        }
+
+        const cardData = this.searchResults[index];
+        
+        try {
+            // Mettre à jour les données actuelles
+            this.currentCardData = cardData;
+            
+            // Repeupler le modal avec les nouvelles données
+            this.populateModal(cardData);
+            
+            // Charger les données JustTCG en arrière-plan
+            setTimeout(() => this.loadJustTCGData(cardData), 100);
+            
+            // Ajouter un indicateur visuel de navigation
+            this.updateNavigationIndicator();
+            
+        } catch (error) {
+            console.error('Erreur lors de la navigation vers la carte:', error);
+            this.api.showNotification('Erreur lors du chargement de la carte: ' + error.message, 'error');
+        }
+    }
+
+    updateNavigationIndicator() {
+        // Afficher l'indicateur seulement si on est en vue recherche avec des résultats
+        if (this.currentView !== 'search' || this.searchResults.length <= 1) {
+            return;
+        }
+
+        const modal = document.getElementById('card-modal');
+        let indicator = modal.querySelector('.navigation-indicator');
+        
+        if (!indicator) {
+            indicator = document.createElement('div');
+            indicator.className = 'navigation-indicator';
+            modal.appendChild(indicator);
+        }
+        
+        // Ajouter des flèches pour indiquer la navigation possible
+        const leftArrow = this.currentCardIndex > 0 ? '← ' : '';
+        const rightArrow = this.currentCardIndex < this.searchResults.length - 1 ? ' →' : '';
+        indicator.textContent = `${leftArrow}${this.currentCardIndex + 1} / ${this.searchResults.length}${rightArrow}`;
+        
+        // Afficher une aide contextuelle la première fois
+        if (!sessionStorage.getItem('keyboard_navigation_help_shown')) {
+            setTimeout(() => {
+                if (this.api && this.api.showNotification) {
+                    this.api.showNotification('💡 Utilisez ← → pour naviguer entre les cartes', 'info', 4000);
+                }
+                sessionStorage.setItem('keyboard_navigation_help_shown', 'true');
+            }, 1000);
         }
     }
 }

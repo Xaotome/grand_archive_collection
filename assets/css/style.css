@@ -2309,3 +2309,144 @@ body {
         font-size: 10px;
     }
 }
+
+/* ===================================================================
+   NAVIGATION CLAVIER
+   =================================================================== */
+
+/* Style pour la carte sélectionnée via le clavier */
+.card-item.keyboard-selected {
+    outline: 3px solid var(--black) !important;
+    outline-offset: 2px;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    background: var(--white);
+    position: relative;
+    z-index: 10;
+    transition: all 0.2s ease;
+}
+
+/* Indicateur visuel supplémentaire pour la sélection clavier */
+.card-item.keyboard-selected::before {
+    content: "⌨️";
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    background: var(--black);
+    color: var(--white);
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    z-index: 11;
+    animation: keyboardPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes keyboardPulse {
+    0%, 100% { 
+        transform: scale(1);
+        opacity: 1;
+    }
+    50% { 
+        transform: scale(1.1);
+        opacity: 0.8;
+    }
+}
+
+/* Focus visible amélioré pour l'accessibilité */
+.card-item:focus-visible {
+    outline: 3px solid var(--black);
+    outline-offset: 2px;
+}
+
+/* Mode liste - ajustement pour la navigation clavier */
+.cards-grid.list-view .card-item.keyboard-selected {
+    transform: translateX(4px);
+}
+
+/* Transition fluide pour toutes les cartes */
+.card-item {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* ===================================================================
+   NAVIGATION MODAL
+   =================================================================== */
+
+/* Indicateur de navigation dans la modal */
+.modal-nav-indicator {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background: rgba(0, 0, 0, 0.8);
+    color: var(--white);
+    padding: 8px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: var(--font-weight-medium);
+    z-index: 1001;
+    backdrop-filter: blur(10px);
+}
+
+/* Instructions de navigation dans la modal */
+.modal-nav-instructions {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.8);
+    color: var(--white);
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 11px;
+    text-align: center;
+    z-index: 1001;
+    opacity: 0.8;
+    backdrop-filter: blur(10px);
+}
+
+.modal-nav-instructions kbd {
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 3px;
+    padding: 2px 6px;
+    margin: 0 2px;
+    font-size: 10px;
+}
+
+/* ===================================================================
+   NAVIGATION INDICATOR MODAL
+   =================================================================== */
+
+.navigation-indicator {
+    position: absolute !important;
+    top: 10px !important;
+    right: 60px !important;
+    background: rgba(0, 0, 0, 0.8) !important;
+    color: var(--white) !important;
+    padding: 8px 12px !important;
+    border-radius: 20px !important;
+    font-size: 12px !important;
+    font-weight: var(--font-weight-medium) !important;
+    z-index: 1001 !important;
+    pointer-events: none !important;
+    backdrop-filter: blur(5px) !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
+    transition: all var(--transition-fast) !important;
+}
+
+.navigation-indicator:empty {
+    display: none !important;
+}
+
+@media (max-width: 768px) {
+    .navigation-indicator {
+        top: 5px !important;
+        right: 35px !important;
+        font-size: 11px !important;
+        padding: 6px 10px !important;
+    }
+}

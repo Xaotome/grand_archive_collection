@@ -129,8 +129,22 @@ class KeyboardManager {
             'Escape': () => this.handleEscape(),
             'KeyF': (e) => this.handleSearch(e),
             'KeyN': (e) => this.handleNew(e),
-            'KeyS': (e) => this.handleSave(e)
+            'KeyS': (e) => this.handleSave(e),
+            // Navigation avec les flèches
+            'ArrowUp': (e) => this.handleArrowNavigation(e, 'up'),
+            'ArrowDown': (e) => this.handleArrowNavigation(e, 'down'),
+            'ArrowLeft': (e) => this.handleArrowNavigation(e, 'left'),
+            'ArrowRight': (e) => this.handleArrowNavigation(e, 'right'),
+            'Enter': (e) => this.handleEnter(e)
         };
+        
+        this.currentCardIndex = -1;
+        this.currentCards = [];
+        this.cardsPerRow = 4; // Par défaut, sera calculé dynamiquement
+        
+        // Variables pour la navigation dans la modal
+        this.modalCardsList = [];
+        this.modalCurrentIndex = -1;
         
         this.init();
     }
@@ -142,6 +156,316 @@ class KeyboardManager {
                 shortcut(e);
             }
         });
+        
+        // Observer les changements de cartes pour mettre à jour la navigation
+        this.observeCardChanges();
+        
+        // Calculer les cartes par ligne au redimensionnement
+        window.addEventListener('resize', () => {
+            this.calculateCardsPerRow();
+        });
+    }
+
+    observeCardChanges() {
+        const observer = new MutationObserver(() => {
+            this.updateCardsList();
+        });
+        
+        // Observer les changements dans la grille de cartes (collection et recherche)
+        const observeContainer = (containerSelector) => {
+            const container = document.querySelector(containerSelector);
+            if (container) {
+                observer.observe(container, { childList: true, subtree: true });
+            }
+        };
+        
+        // Observer les différents conteneurs de cartes
+        observeContainer('.cards-grid'); // Vue collection
+        observeContainer('#search-results'); // Vue recherche si elle existe
+        
+        // Observer aussi les changements de vue
+        document.addEventListener('click', (e) => {
+            if (e.target.classList.contains('nav-btn')) {
+                // Réinitialiser la sélection lors du changement de vue
+                setTimeout(() => {
+                    this.resetSelection();
+                    this.updateCardsList();
+                }, 100);
+            }
+        });
+    }
+
+    resetSelection() {
+        // Désélectionner la carte actuelle
+        if (this.currentCardIndex >= 0 && this.currentCards[this.currentCardIndex]) {
+            this.currentCards[this.currentCardIndex].classList.remove('keyboard-selected');
+        }
+        this.currentCardIndex = -1;
+    }
+
+    updateCardsList() {
+        const cardElements = document.querySelectorAll('.card-item:not(.no-results):not(.loading)');
+        this.currentCards = Array.from(cardElements);
+        
+        // Calculer le nombre de cartes par ligne
+        this.calculateCardsPerRow();
+        
+        // Si aucune carte n'est sélectionnée et qu'il y a des cartes, ne pas sélectionner automatiquement
+        if (this.currentCardIndex >= this.currentCards.length) {
+            this.currentCardIndex = -1;
+        }
+    }
+
+    calculateCardsPerRow() {
+        if (this.currentCards.length < 2) {
+            this.cardsPerRow = 1;
+            return;
+        }
+        
+        const firstCard = this.currentCards[0];
+        const secondCard = this.currentCards[1];
+        
+        if (firstCard && secondCard) {
+            const firstRect = firstCard.getBoundingClientRect();
+            const secondRect = secondCard.getBoundingClientRect();
+            
+            // Si la deuxième carte est sur la même ligne que la première
+            if (Math.abs(firstRect.top - secondRect.top) < 10) {
+                // Compter combien de cartes sont sur la première ligne
+                let cardsInFirstRow = 1;
+                for (let i = 1; i < this.currentCards.length; i++) {
+                    const cardRect = this.currentCards[i].getBoundingClientRect();
+                    if (Math.abs(firstRect.top - cardRect.top) < 10) {
+                        cardsInFirstRow++;
+                    } else {
+                        break;
+                    }
+                }
+                this.cardsPerRow = cardsInFirstRow;
+            } else {
+                this.cardsPerRow = 1; // Mode liste
+            }
+        }
+    }
+
+    handleArrowNavigation(e, direction) {
+        // Ne pas naviguer si on est dans un input ou textarea
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+            return;
+        }
+        
+        // Vérifier si une modal est ouverte
+        const modal = document.getElementById('card-modal');
+        if (modal && modal.style.display === 'block') {
+            // Navigation dans la modal (seulement gauche/droite)
+            if (direction === 'left' || direction === 'right') {
+                this.handleModalNavigation(e, direction);
+            }
+            return;
+        }
+        
+        this.updateCardsList();
+        
+        if (this.currentCards.length === 0) {
+            return;
+        }
+        
+        e.preventDefault();
+        
+        let newIndex = this.currentCardIndex;
+        
+        switch (direction) {
+            case 'right':
+                if (this.currentCardIndex === -1) {
+                    newIndex = 0; // Commencer par la première carte
+                } else {
+                    newIndex = Math.min(this.currentCardIndex + 1, this.currentCards.length - 1);
+                }
+                break;
+                
+            case 'left':
+                if (this.currentCardIndex === -1) {
+                    newIndex = 0;
+                } else {
+                    newIndex = Math.max(this.currentCardIndex - 1, 0);
+                }
+                break;
+                
+            case 'down':
+                if (this.currentCardIndex === -1) {
+                    newIndex = 0;
+                } else {
+                    newIndex = Math.min(this.currentCardIndex + this.cardsPerRow, this.currentCards.length - 1);
+                }
+                break;
+                
+            case 'up':
+                if (this.currentCardIndex === -1) {
+                    newIndex = 0;
+                } else {
+                    newIndex = Math.max(this.currentCardIndex - this.cardsPerRow, 0);
+                }
+                break;
+        }
+        
+        this.selectCard(newIndex);
+    }
+
+    handleEnter(e) {
+        // Ne pas agir si on est dans un input ou textarea
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+            return;
+        }
+        
+        // Si une carte est sélectionnée, l'ouvrir
+        if (this.currentCardIndex >= 0 && this.currentCards[this.currentCardIndex]) {
+            e.preventDefault();
+            this.currentCards[this.currentCardIndex].click();
+        }
+    }
+
+    selectCard(index) {
+        // Désélectionner la carte actuelle
+        if (this.currentCardIndex >= 0 && this.currentCards[this.currentCardIndex]) {
+            this.currentCards[this.currentCardIndex].classList.remove('keyboard-selected');
+        }
+        
+        // Sélectionner la nouvelle carte
+        this.currentCardIndex = index;
+        const selectedCard = this.currentCards[this.currentCardIndex];
+        
+        if (selectedCard) {
+            selectedCard.classList.add('keyboard-selected');
+            
+            // Faire défiler pour voir la carte sélectionnée
+            selectedCard.scrollIntoView({
+                behavior: 'smooth',
+                block: 'center'
+            });
+        }
+    }
+
+    handleModalNavigation(e, direction) {
+        e.preventDefault();
+        
+        // Mettre à jour la liste des cartes pour la modal si nécessaire
+        if (this.modalCardsList.length === 0) {
+            this.modalCardsList = Array.from(this.currentCards);
+            // Trouver l'index de la carte actuellement affichée dans la modal
+            this.modalCurrentIndex = this.currentCardIndex >= 0 ? this.currentCardIndex : 0;
+        }
+        
+        if (this.modalCardsList.length === 0) {
+            return;
+        }
+        
+        let newIndex = this.modalCurrentIndex;
+        
+        if (direction === 'right') {
+            newIndex = (this.modalCurrentIndex + 1) % this.modalCardsList.length;
+        } else if (direction === 'left') {
+            newIndex = (this.modalCurrentIndex - 1 + this.modalCardsList.length) % this.modalCardsList.length;
+        }
+        
+        this.modalCurrentIndex = newIndex;
+        
+        // Mettre à jour l'indicateur de navigation
+        this.updateModalNavigationIndicator();
+        
+        // Ouvrir la nouvelle carte dans la modal
+        const targetCard = this.modalCardsList[newIndex];
+        if (targetCard && window.collectionManager) {
+            // Obtenir les données de la carte à partir de l'élément DOM
+            const cardUuid = targetCard.dataset.cardUuid;
+            const editionUuid = targetCard.dataset.editionUuid;
+            
+            if (cardUuid) {
+                // Fermer proprement la modal actuelle et ouvrir la nouvelle
+                this.switchModalCard(cardUuid, editionUuid, targetCard);
+            }
+        }
+    }
+
+    switchModalCard(cardUuid, editionUuid, cardElement) {
+        // Extraire les données de la carte depuis l'élément DOM ou depuis les données stockées
+        const cardData = this.extractCardDataFromElement(cardElement);
+        
+        // Ouvrir la nouvelle carte sans fermer/rouvrir la modal
+        if (window.collectionManager && window.collectionManager.openCardModal) {
+            window.collectionManager.openCardModal(cardUuid, editionUuid, cardData);
+        }
+    }
+
+    extractCardDataFromElement(cardElement) {
+        // Extraire les données de base depuis l'élément DOM
+        const cardName = cardElement.querySelector('.card-name')?.textContent || '';
+        const cardSet = cardElement.querySelector('.card-set')?.textContent || '';
+        const cardRarity = cardElement.querySelector('.card-rarity')?.textContent || '';
+        const cardElementType = cardElement.querySelector('.card-element')?.textContent || '';
+        const cardClasses = cardElement.querySelector('.card-classes')?.textContent || '';
+        const cardImage = cardElement.querySelector('img')?.src || '';
+        
+        // Construire un objet de données basique
+        return {
+            uuid: cardElement.dataset.cardUuid,
+            edition_uuid: cardElement.dataset.editionUuid,
+            name: cardName,
+            set_prefix: cardSet,
+            rarity: cardRarity,
+            element: cardElementType,
+            classes: cardClasses,
+            image: cardImage,
+            // Ces données seront récupérées par l'API dans openCardModal
+        };
+    }
+
+    // Réinitialiser la navigation modal quand on ferme la modal
+    resetModalNavigation() {
+        this.modalCardsList = [];
+        this.modalCurrentIndex = -1;
+    }
+
+    // Méthode publique pour initialiser la navigation modal depuis l'extérieur
+    initModalNavigation(cardIndex = -1) {
+        this.modalCardsList = Array.from(this.currentCards);
+        this.modalCurrentIndex = cardIndex >= 0 ? cardIndex : this.currentCardIndex;
+        this.addModalNavigationIndicators();
+    }
+
+    addModalNavigationIndicators() {
+        const modal = document.getElementById('card-modal');
+        if (!modal) return;
+
+        // Supprimer les anciens indicateurs s'ils existent
+        const existingIndicator = modal.querySelector('.modal-nav-indicator');
+        const existingInstructions = modal.querySelector('.modal-nav-instructions');
+        if (existingIndicator) existingIndicator.remove();
+        if (existingInstructions) existingInstructions.remove();
+
+        // Ajouter l'indicateur de position si on a plusieurs cartes
+        if (this.modalCardsList.length > 1) {
+            const indicator = document.createElement('div');
+            indicator.className = 'modal-nav-indicator';
+            indicator.textContent = `${this.modalCurrentIndex + 1} / ${this.modalCardsList.length}`;
+            modal.appendChild(indicator);
+
+            // Ajouter les instructions de navigation
+            const instructions = document.createElement('div');
+            instructions.className = 'modal-nav-instructions';
+            instructions.innerHTML = `
+                <kbd>←</kbd> Carte précédente 
+                <kbd>→</kbd> Carte suivante 
+                <kbd>Échap</kbd> Fermer
+            `;
+            modal.appendChild(instructions);
+        }
+    }
+
+    updateModalNavigationIndicator() {
+        const indicator = document.querySelector('.modal-nav-indicator');
+        if (indicator && this.modalCardsList.length > 1) {
+            indicator.textContent = `${this.modalCurrentIndex + 1} / ${this.modalCardsList.length}`;
+        }
     }
 
     handleEscape() {
@@ -149,6 +473,14 @@ class KeyboardManager {
         const modal = document.getElementById('card-modal');
         if (modal && modal.style.display === 'block') {
             window.collectionManager.closeModal();
+            this.resetModalNavigation(); // Réinitialiser la navigation modal
+            return;
+        }
+        
+        // Désélectionner la carte actuelle
+        if (this.currentCardIndex >= 0 && this.currentCards[this.currentCardIndex]) {
+            this.currentCards[this.currentCardIndex].classList.remove('keyboard-selected');
+            this.currentCardIndex = -1;
         }
     }
 

@@ -15,6 +15,7 @@
       "WebFetch(domain:www.balenciaga.com)",
       "WebFetch(domain:thmspcrx.dev)"
     ],
-    "deny": []
+    "deny": [],
+    "defaultMode": "acceptEdits"
   }
 }
